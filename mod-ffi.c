@@ -22,30 +22,45 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 
-#define REBOL_IMPLICIT_END  // don't require rebEND in API calls (C99 or C++)
 #include "sys-core.h"
-
 #include "tmp-mod-ffi.h"
 
 #include "reb-struct.h"
 
-REBTYP *EG_Struct_Type = nullptr;  // (E)xtension (G)lobal
 
 // There is a platform-dependent list of legal ABIs which the MAKE-ROUTINE
-// and MAKE-CALLBACK natives take as an option via refinement
+// and MAKE-CALLBACK natives take as an option via refinement.
 //
-static ffi_abi Abi_From_Word(const REBVAL *word) {
-    if (word == nullptr)
+// It was written as librebol code using a Rebol SWITCH, instead of as C
+// code.  It would be more optimal to use the EXT_SYM_XXX symbols in plain
+// C, but since this was written it serves as a good API test for now.  If
+// performance of the FFI becomes an issue, we can revisit this.
+//
+// 1. In order to use #ifdefs inside the call, we cannot use the variadic
+//    macro for rebUnboxInteger that injects rebEND and LIBREBOL_CONTEXT,
+//    because it would try to wrap the #ifdefs in a __VA_ARGS__.  So we use
+//    the plain non-macro call and add rebEND and LIBREBOL_SPECIFIER manually.
+//    Hence we use the rebUnboxInteger_c89() variant.
+//
+//    (It also means we can't use u_cast(ffi_abi, xxx) because u_cast is
+//    also a macro.  Could use old-style (ffi_abi) cast... but religion
+//    dictates avoiding that, and instead casting as a separate step.)
+//
+// 2. !!! While these are defined on newer versions of LINUX X86/X64 FFI
+//    older versions (e.g. 3.0.13) only have STDCALL/THISCALL/FASTCALL
+//    on Windows.  We could detect the FFI version, but since basically
+//    no one uses anything but the default punt on it for now.
+//
+static ffi_abi Abi_From_Word_Or_Nulled(const Value* word) {
+    if (Is_Nulled(word))
         return FFI_DEFAULT_ABI;
 
-    assert(IS_WORD(word));
+    assert(Is_Word(word));
 
-    // In order to use #ifdefs inside the call, we cannot use the variadic
-    // macro that injects rebEND, but need to use a plain C call and add our
-    // own rebEND.
-    //
-    ffi_abi abi = (ffi_abi)LIBREBOL_NOMACRO(rebUnboxInteger)(
-      "switch", rebQ(word), "[",
+    intptr_t abi_int = rebUnboxInteger_c89(  // _c89 -> no macro, ifdef [1]
+        LIBREBOL_BINDING_NAME(),
+
+      "switch @", word, "[",
 
         "'default [", rebI(FFI_DEFAULT_ABI), "]",
 
@@ -58,12 +73,7 @@ static ffi_abi Abi_From_Word(const REBVAL *word) {
 
         /* "'sysv [", rebI(FFI_SYSV), "]", */  // !!! Should this be defined?
 
-        // !!! While these are defined on newer versions of LINUX X86/X64 FFI
-        // older versions (e.g. 3.0.13) only have STDCALL/THISCALL/FASTCALL
-        // on Windows.  We could detect the FFI version, but since basically
-        // no one uses anything but the default punt on it for now.
-        //
-        #ifdef X86_WIN32
+        #ifdef X86_WIN32  // old Linux FFI doesn't have these [2]
             "'stdcall [", rebI(FFI_STDCALL), "]",
             "'thiscall [", rebI(FFI_THISCALL), "]",
             "'fastcall [", rebI(FFI_FASTCALL), "]",
@@ -91,71 +101,19 @@ static ffi_abi Abi_From_Word(const REBVAL *word) {
 
       #endif  // X86_WIN64
 
-        "fail [{Unknown ABI for platform:}", rebQ(word), "]",
+        "fail [-{Unknown ABI for platform:}- @", word, "]",
       "]",
-      rebEND  // <-- rebEND required, call is not a macro (LIBREBOL_NOMACRO)
+      rebEND  // <-- rebEND required, rebUnboxInteger_c89() is not a macro
     );
 
-    return abi;
-}
-
-
-//
-//  register-struct-hooks: native [
-//
-//  {Make the STRUCT! datatype work with GENERIC actions, comparison ops, etc}
-//
-//      return: [void!]
-//      generics "List for HELP of which generics are supported (unused)"
-//          [block!]
-//  ]
-//
-REBNATIVE(register_struct_hooks)
-{
-    FFI_INCLUDE_PARAMS_OF_REGISTER_STRUCT_HOOKS;
-
-    Extend_Generics_Someday(ARG(generics));  // !!! vaporware, see comments
-
-    // !!! See notes on Hook_Datatype for this poor-man's substitute for a
-    // coherent design of an extensible object system (as per Lisp's CLOS)
-    //
-    EG_Struct_Type = Hook_Datatype(
-        "http://datatypes.rebol.info/struct",
-        "native structure definition",
-        &T_Struct,
-        &PD_Struct,
-        &CT_Struct,
-        &MAKE_Struct,
-        &TO_Struct,
-        &MF_Struct
-    );
-
-    return Init_Void(D_OUT, SYM_VOID);
-}
-
-
-//
-//  unregister-struct-hooks: native [
-//
-//  {Remove behaviors for STRUCT! added by REGISTER-STRUCT-HOOKS}
-//
-//      return: [void!]
-//  ]
-//
-REBNATIVE(unregister_struct_hooks)
-{
-    FFI_INCLUDE_PARAMS_OF_UNREGISTER_STRUCT_HOOKS;
-
-    Unhook_Datatype(EG_Struct_Type);
-
-    return Init_Void(D_OUT, SYM_VOID);
+    return u_cast(ffi_abi, abi_int);
 }
 
 
 //
 //  export make-routine: native [
 //
-//  {Create a bridge for interfacing with arbitrary C code in a DLL}
+//  "Create a bridge for interfacing with arbitrary C code in a DLL"
 //
 //      return: [action!]
 //      lib "Library DLL that C function lives in (from MAKE LIBRARY!)"
@@ -164,109 +122,112 @@ REBNATIVE(unregister_struct_hooks)
 //          [text!]
 //      ffi-spec "Description of what C argument types the C function takes"
 //          [block!]
-//      /abi "Application Binary Interface ('CDECL, 'FASTCALL, etc.)"
+//      :abi "Application Binary Interface ('CDECL, 'FASTCALL, etc.)"
 //          [word!]
 //  ]
 //
-REBNATIVE(make_routine)
-//
-// !!! Would be nice if this could just take a filename and the lib management
-// was automatic, e.g. no LIBRARY! type.
+DECLARE_NATIVE(MAKE_ROUTINE)
 {
-    FFI_INCLUDE_PARAMS_OF_MAKE_ROUTINE;
+    INCLUDE_PARAMS_OF_MAKE_ROUTINE;
 
-    ffi_abi abi = Abi_From_Word(REF(abi));
+    ffi_abi abi = Abi_From_Word_Or_Nulled(ARG(ABI));
 
-    REBLIB *lib = VAL_LIBRARY(ARG(lib));
-    if (lib == nullptr)  // library was closed with CLOSE
-        fail (PAR(lib));
+    Element* spec = Element_ARG(FFI_SPEC);
 
-    // Find_Function takes a char* on both Windows and Posix.
-    //
-    // !!! Should it error if any bytes aren't ASCII?
-    //
-    REBCHR(const*) utf8 = VAL_UTF8_AT(ARG(name));
+    RebolValue* handle = rebEntrap("pick", ARG(LIB), ARG(NAME));
+    if (Is_Error(handle))  // PICK returned raised error, entrap made it plain
+        return FAIL(Cell_Error(handle));
 
-    CFUNC *cfunc = Find_Function(LIB_FD(lib), cast(const char*, utf8));
-    if (cfunc == nullptr)
-        fail ("FFI: Couldn't find function in library");
+    Unquotify(Known_Element(handle));  // rebEntrap() is quoted for non-raised
+    assert(Is_Handle_Cfunc(handle));
 
-    // Process the parameter types into a function, then fill it in
+    RoutineDetails* r;
+    Option(Error*) e = Trap_Alloc_Ffi_Action_For_Spec(&r, spec, abi);
+    if (e)
+        return FAIL(unwrap e);
 
-    REBACT *routine = Alloc_Ffi_Action_For_Spec(ARG(ffi_spec), abi);
-    REBRIN *r = ACT_DETAILS(routine);
+    Copy_Cell(Routine_At(r, IDX_ROUTINE_CFUNC), handle);
+    Init_Blank(Routine_At(r, IDX_ROUTINE_CLOSURE));
+    Copy_Cell(Routine_At(r, IDX_ROUTINE_ORIGIN), ARG(LIB));
 
-    Init_Handle_Cfunc(RIN_AT(r, IDX_ROUTINE_CFUNC), cfunc);
-    Init_Blank(RIN_AT(r, IDX_ROUTINE_CLOSURE));
-    Copy_Cell(RIN_AT(r, IDX_ROUTINE_ORIGIN), ARG(lib));
-
-    return Init_Action(D_OUT, routine, ANONYMOUS, UNBOUND);
+    return Init_Action(OUT, r, ANONYMOUS, UNBOUND);
 }
 
 
 //
 //  export make-routine-raw: native [
 //
-//  {Create a bridge for interfacing with a C function, by pointer}
+//  "Create a bridge for interfacing with a C function, by pointer"
 //
 //      return: [action!]
 //      pointer "Raw address of C function in memory"
 //          [integer!]
 //      ffi-spec "Description of what C argument types the C function takes"
 //          [block!]
-//      /abi "Application Binary Interface ('CDECL, 'FASTCALL, etc.)"
+//      :abi "Application Binary Interface ('CDECL, 'FASTCALL, etc.)"
 //          [word!]
 //  ]
 //
-REBNATIVE(make_routine_raw)
+DECLARE_NATIVE(MAKE_ROUTINE_RAW)
 //
 // !!! Would be nice if this could just take a filename and the lib management
 // was automatic, e.g. no LIBRARY! type.
 {
-    FFI_INCLUDE_PARAMS_OF_MAKE_ROUTINE_RAW;
+    INCLUDE_PARAMS_OF_MAKE_ROUTINE_RAW;
 
-    ffi_abi abi = Abi_From_Word(REF(abi));
+    ffi_abi abi = Abi_From_Word_Or_Nulled(ARG(ABI));
 
-    // Cannot cast directly to a function pointer from a 64-bit value
-    // on 32-bit systems.
-    //
-    CFUNC *cfunc = cast(CFUNC*, cast(uintptr_t, VAL_INT64(ARG(pointer))));
+    Element* spec = Element_ARG(FFI_SPEC);
+
+    CFunction* cfunc = p_cast(CFunction*,  // can't directly cast on 32-bit
+        cast(uintptr_t, VAL_INT64(ARG(POINTER))
+    ));
     if (cfunc == nullptr)
-        fail ("FFI: nullptr pointer not allowed for raw MAKE-ROUTINE");
+        return FAIL("FFI: nullptr pointer not allowed for raw MAKE-ROUTINE");
 
-    REBACT *routine = Alloc_Ffi_Action_For_Spec(ARG(ffi_spec), abi);
-    REBRIN *r = ACT_DETAILS(routine);
+    RoutineDetails* r;
+    Option(Error*) e = Trap_Alloc_Ffi_Action_For_Spec(&r, spec, abi);
+    if (e)
+        return FAIL(unwrap e);
 
-    Init_Handle_Cfunc(RIN_AT(r, IDX_ROUTINE_CFUNC), cfunc);
-    Init_Blank(RIN_AT(r, IDX_ROUTINE_CLOSURE));
-    Init_Blank(RIN_AT(r, IDX_ROUTINE_ORIGIN)); // no LIBRARY! in this case.
+    Init_Handle_Cfunc(Routine_At(r, IDX_ROUTINE_CFUNC), cfunc);
+    Init_Blank(Routine_At(r, IDX_ROUTINE_CLOSURE));
+    Init_Blank(Routine_At(r, IDX_ROUTINE_ORIGIN)); // no LIBRARY! in this case.
 
-    return Init_Action(D_OUT, routine, ANONYMOUS, UNBOUND);
+    return Init_Action(OUT, r, ANONYMOUS, UNBOUND);
 }
 
 
 //
 //  export wrap-callback: native [
 //
-//  {Wrap an ACTION! so it can be called by raw C code via a memory address.}
+//  "Wrap an ACTION! so it can be called by raw C code via a memory address"
 //
 //      return: [action!]
 //      action "The existing Rebol action whose behavior is being wrapped"
 //          [action!]
 //      ffi-spec "What C types each Rebol argument should map to"
 //          [block!]
-//      /abi "Application Binary Interface ('CDECL, 'FASTCALL, etc.)"
+//      :abi "Application Binary Interface ('CDECL, 'FASTCALL, etc.)"
 //          [word!]
 //  ]
 //
-REBNATIVE(wrap_callback)
+DECLARE_NATIVE(WRAP_CALLBACK)
+//
+// 1. It's the FFI's fault for using the wrong type for the thunk.  Use a
+//    memcpy in order to get around strict checks that absolutely refuse to
+//    let you do a cast here.
 {
-    FFI_INCLUDE_PARAMS_OF_WRAP_CALLBACK;
+    INCLUDE_PARAMS_OF_WRAP_CALLBACK;
 
-    ffi_abi abi = Abi_From_Word(REF(abi));;
+    ffi_abi abi = Abi_From_Word_Or_Nulled(ARG(ABI));
 
-    REBACT *callback = Alloc_Ffi_Action_For_Spec(ARG(ffi_spec), abi);
-    REBRIN *r = ACT_DETAILS(callback);
+    Element* spec = Element_ARG(FFI_SPEC);
+
+    RoutineDetails* r;
+    Option(Error*) e = Trap_Alloc_Ffi_Action_For_Spec(&r, spec, abi);
+    if (e)
+        return FAIL(unwrap e);
 
     void *thunk;  // actually CFUNC (FFI uses void*, may not be same size!)
     ffi_closure *closure = cast(ffi_closure*, ffi_closure_alloc(
@@ -274,47 +235,43 @@ REBNATIVE(wrap_callback)
     ));
 
     if (closure == nullptr)
-        fail ("FFI: Couldn't allocate closure");
+        return FAIL("FFI: Couldn't allocate closure");
 
     ffi_status status = ffi_prep_closure_loc(
         closure,
-        RIN_CIF(r),
+        Routine_Cif(r),
         callback_dispatcher,  // when thunk is called, calls this function...
         r,  // ...and this piece of data is passed to callback_dispatcher
         thunk
     );
 
     if (status != FFI_OK)
-        fail ("FFI: Couldn't prep closure");
+        return FAIL("FFI: Couldn't prep closure");
 
     bool check = true;  // avoid "conditional expression is constant"
-    if (check && sizeof(void*) != sizeof(CFUNC*))
-        fail ("FFI does not work when void* size differs from CFUNC* size");
+    if (check and sizeof(void*) != sizeof(CFunction*))
+        return FAIL("FFI requires void* size equal C function pointer size");
 
-    // It's the FFI's fault for using the wrong type for the thunk.  Use a
-    // memcpy in order to get around strict checks that absolutely refuse to
-    // let you do a cast here.
-    //
-    CFUNC *cfunc_thunk;
+    CFunction* cfunc_thunk;  // FFI uses wrong type [1]
     memcpy(&cfunc_thunk, &thunk, sizeof(cfunc_thunk));
 
-    Init_Handle_Cfunc(RIN_AT(r, IDX_ROUTINE_CFUNC), cfunc_thunk);
+    Init_Handle_Cfunc(Routine_At(r, IDX_ROUTINE_CFUNC), cfunc_thunk);
     Init_Handle_Cdata_Managed(
-        RIN_AT(r, IDX_ROUTINE_CLOSURE),
+        Routine_At(r, IDX_ROUTINE_CLOSURE),
         closure,
         sizeof(&closure),
         &cleanup_ffi_closure
     );
-    Copy_Cell(RIN_AT(r, IDX_ROUTINE_ORIGIN), ARG(action));
+    Copy_Cell(Routine_At(r, IDX_ROUTINE_ORIGIN), ARG(ACTION));
 
-    return Init_Action(D_OUT, callback, ANONYMOUS, UNBOUND);
+    return Init_Action(OUT, r, ANONYMOUS, UNBOUND);
 }
 
 
 //
 //  export addr-of: native [
 //
-//  {Get the memory address of an FFI STRUCT! or routine/callback}
+//  "Get the memory address of an FFI STRUCT! or routine/callback"
 //
 //      return: "Memory address expressed as an up-to-64-bit integer"
 //          [integer!]
@@ -322,37 +279,41 @@ REBNATIVE(wrap_callback)
 //          [action! struct!]
 //  ]
 //
-REBNATIVE(addr_of) {
-    FFI_INCLUDE_PARAMS_OF_ADDR_OF;
+DECLARE_NATIVE(ADDR_OF)
+//
+// 1. The CFunction is fabricated by the FFI if it's a callback, or just the
+//    wrapped DLL function if it's an ordinary routine
+//
+// 2. !!! If a structure wasn't mapped onto "raw-memory" from the C,
+//    then currently the data for that struct is a BINARY!, not a handle to
+//    something which was malloc'd.  Much of the system is designed to be
+//    able to handle memory relocations of a series data, but if a pointer is
+//    given to code it may expect that address to be permanent.  Data
+//    pointers currently do not move (e.g. no GC compaction) unless there is
+//    a modification to the series, but this may change...in which case a
+//    "do not move in memory" bit would be needed for the BINARY! or a
+//    HANDLE! to a non-moving malloc would need to be used instead.
+{
+    INCLUDE_PARAMS_OF_ADDR_OF;
 
-    REBVAL *v = ARG(value);
+    Value* v = ARG(VALUE);
 
-    if (IS_ACTION(v)) {
-        if (not IS_ACTION_RIN(v))
-            fail ("Can only take address of ACTION!s created though FFI");
+    if (Is_Action(v)) {
+        if (not Is_Action_Routine(v))
+            return FAIL(
+                "Can only take address of ACTION!s created though FFI"
+            );
 
-        // The CFUNC is fabricated by the FFI if it's a callback, or
-        // just the wrapped DLL function if it's an ordinary routine
-        //
-        REBRIN *rin = ACT_DETAILS(VAL_ACTION(v));
+        RoutineDetails* r = Ensure_Cell_Frame_Details(v);
         return Init_Integer(
-            D_OUT, cast(intptr_t, RIN_CFUNC(rin))
+            OUT,
+            i_cast(intptr_t, Routine_Cfunc(r))  // fabricated or wrapped [1]
         );
     }
 
-    assert(IS_STRUCT(v));
+    assert(Is_Struct(v));
 
-    // !!! If a structure wasn't mapped onto "raw-memory" from the C,
-    // then currently the data for that struct is a BINARY!, not a handle to
-    // something which was malloc'd.  Much of the system is designed to be
-    // able to handle memory relocations of a series data, but if a pointer is
-    // given to code it may expect that address to be permanent.  Data
-    // pointers currently do not move (e.g. no GC compaction) unless there is
-    // a modification to the series, but this may change...in which case a
-    // "do not move in memory" bit would be needed for the BINARY! or a
-    // HANDLE! to a non-moving malloc would need to be used instead.
-    //
-    return Init_Integer(D_OUT, cast(intptr_t, VAL_STRUCT_DATA_AT(v)));
+    return Init_Integer(OUT, i_cast(intptr_t, Cell_Struct_Data_At(v)));  // [2]
 }
 
 
@@ -365,115 +326,118 @@ REBNATIVE(addr_of) {
 //      spec "Struct with interface to copy"
 //          [struct!]
 //      body "keys and values defining instance contents (bindings modified)"
-//          [block! any-context! blank!]
+//          [block! any-context? blank!]
 //  ]
 //
-REBNATIVE(make_similar_struct)
+DECLARE_NATIVE(MAKE_SIMILAR_STRUCT)
 //
 // !!! Compatibility for `MAKE some-struct [...]` from Atronix R3.  There
 // isn't any real "inheritance management" for structs, but it allows the
 // re-use of the structure's field definitions, so it is a means of saving on
 // memory (?)  Code retained for examination.
 {
-    FFI_INCLUDE_PARAMS_OF_MAKE_SIMILAR_STRUCT;
+    INCLUDE_PARAMS_OF_MAKE_SIMILAR_STRUCT;
 
-    REBVAL *spec = ARG(spec);
-    REBVAL *body = ARG(body);
+    Element* spec = Element_ARG(SPEC);
+    Element* body = Element_ARG(BODY);
 
-    Init_Struct(D_OUT, Copy_Struct_Managed(VAL_STRUCT(spec)));
-    Init_Struct_Fields(D_OUT, body);
-    return D_OUT;
+    Init_Struct(OUT, Copy_Struct_Managed(Cell_Struct(spec)));
+
+    Option(Error*) e = Trap_Init_Struct_Fields(OUT, body);
+    if (e)
+        return FAIL(unwrap e);
+
+    return OUT;
 }
 
 
 //
-//  destroy-struct-storage: native [
+//  destroy-struct-storage: native [  ; EXPORT ?
 //
-//  {Destroy the external memory associated the struct}
+//  "Destroy the external memory associated the struct"
 //
+//      return: [~]
 //      struct [struct!]
-//      /free "Specify the function to free the memory"
+//      :free "Specify the function to free the memory"
 //          [action!]
 //  ]
 //
-REBNATIVE(destroy_struct_storage)
+DECLARE_NATIVE(DESTROY_STRUCT_STORAGE)
 {
-    FFI_INCLUDE_PARAMS_OF_DESTROY_STRUCT_STORAGE;
+    INCLUDE_PARAMS_OF_DESTROY_STRUCT_STORAGE;
 
-    if (IS_BINARY(VAL_STRUCT_DATA(ARG(struct))))
-        fail (Error_No_External_Storage_Raw());
+    if (Is_Blob(Struct_Storage(Cell_Struct(ARG(STRUCT)))))
+        return FAIL("Can't use external storage with DESTROY-STRUCT-STORAGE");
 
-    RELVAL *handle = VAL_STRUCT_DATA(ARG(struct));
+    Element* handle = Struct_Storage(Cell_Struct(ARG(STRUCT)));
 
-    DECLARE_LOCAL (pointer);
-    Init_Integer(pointer, cast(intptr_t, VAL_HANDLE_POINTER(void, handle)));
+    DECLARE_ELEMENT (pointer);
+    Init_Integer(pointer, i_cast(intptr_t, Cell_Handle_Pointer(void, handle)));
 
-    if (VAL_HANDLE_LEN(handle) == 0)
-        fail (Error_Already_Destroyed_Raw(pointer));
+    if (Cell_Handle_Len(handle) == 0)
+        return FAIL("DESTROY-STRUCT-STORAGE given already destroyed handle");
 
-    // TBD: assert handle length was correct for memory block size
+    CELL_HANDLE_LENGTH_U(handle) = 0;  // !!! assert correct for mem block size
 
-    SET_HANDLE_LEN(handle, 0);
+    if (Bool_ARG(FREE)) {
+        if (not Is_Action_Routine(ARG(FREE)))
+            return FAIL(Error_Free_Needs_Routine_Raw());
 
-    if (REF(free)) {
-        if (not IS_ACTION_RIN(ARG(free)))
-            fail (Error_Free_Needs_Routine_Raw());
-
-        rebElideQ(rebU(ARG(free)), pointer, rebEND);
+        rebElide(rebRUN(ARG(FREE)), pointer);
     }
 
-    return nullptr;
+    return NOTHING;
 }
 
 
 //
 //  export alloc-value-pointer: native [
 //
-//  {Persistently allocate a cell that can be referenced from FFI routines}
+//  "Persistently allocate a cell that can be referenced from FFI routines"
 //
 //      return: [integer!]
 //      value "Initial value for the cell"
-//          [any-value!]
+//          [any-value?]
 //  ]
 //
-REBNATIVE(alloc_value_pointer)
+DECLARE_NATIVE(ALLOC_VALUE_POINTER)
 //
 // !!! Would it be better to not bother with the initial value parameter and
-// just start the cell out blank?
+// just start the cell out as nothing?
 {
-    FFI_INCLUDE_PARAMS_OF_ALLOC_VALUE_POINTER;
+    INCLUDE_PARAMS_OF_ALLOC_VALUE_POINTER;
 
-    REBVAL *allocated = Copy_Cell(Alloc_Value(), ARG(value));
+    Value* allocated = Copy_Cell(Alloc_Value(), ARG(VALUE));
     rebUnmanage(allocated);
 
-    return Init_Integer(D_OUT, cast(intptr_t, allocated));
+    return Init_Integer(OUT, i_cast(intptr_t, allocated));
 }
 
 
 //
 //  export free-value-pointer: native [
 //
-//  {Free a cell that was allocated by ALLOC-VALUE-POINTER}
+//  "Free a cell that was allocated by ALLOC-VALUE-POINTER"
 //
-//      return: [<opt>]
+//      return: [~]
 //      pointer [integer!]
 //  ]
 //
-REBNATIVE(free_value_pointer)
+DECLARE_NATIVE(FREE_VALUE_POINTER)
+//
+// 1. Although currently unmanaged API handles are used, it would also be
+//    possible to use a managed ones.
+//
+//    Currently there's no way to make GC-visible references to the returned
+//    pointer.  So the only value of using a managed strategy would be to
+//    have the GC clean up leaks on exit instead of complaining in the
+//    debug build.  For now, assume complaining is better.
 {
-    FFI_INCLUDE_PARAMS_OF_FREE_VALUE_POINTER;
+    INCLUDE_PARAMS_OF_FREE_VALUE_POINTER;
 
-    REBVAL *cell = cast(REBVAL*, cast(intptr_t, VAL_INT64(ARG(pointer))));
+    Value* cell = p_cast(Value*, cast(intptr_t, VAL_INT64(ARG(POINTER))));
 
-    // Although currently unmanaged API handles are used, it would also be
-    // possible to use a managed ones.
-    //
-    // Currently there's no way to make GC-visible references to the returned
-    // pointer.  So the only value of using a managed strategy would be to
-    // have the GC clean up leaks on exit instead of complaining in the
-    // debug build.  For now, assume complaining is better.
-    //
-    rebFree(cell);
+    rebFree(cell);  // unmanaged [1]
 
     return nullptr;
 }
@@ -482,15 +446,15 @@ REBNATIVE(free_value_pointer)
 //
 //  export get-at-pointer: native [
 //
-//  {Get the contents of a cell, e.g. one returned by ALLOC-VALUE-POINTER}
+//  "Get the contents of a cell, e.g. one returned by ALLOC-VALUE-POINTER"
 //
-//      return: "If the source looks up to a value, that value--else blank"
-//          [<opt> any-value!]
+//      return: "If the source looks up to a value, that value--else null"
+//          [~null~ any-value?]
 //      source "A pointer to a Rebol value"
 //          [integer!]
 //  ]
 //
-REBNATIVE(get_at_pointer)
+DECLARE_NATIVE(GET_AT_POINTER)
 //
 // !!! In an ideal future, the FFI would probably add a user-defined-type
 // for a POINTER!, and then GET could be overloaded to work with it.  No
@@ -500,43 +464,76 @@ REBNATIVE(get_at_pointer)
 // !!! Alloc_Value() doesn't currently prohibit nulled cells mechanically,
 // but libRebol doesn't allow them.  What should this API do?
 {
-    FFI_INCLUDE_PARAMS_OF_GET_AT_POINTER;
+    INCLUDE_PARAMS_OF_GET_AT_POINTER;
 
-    REBVAL *cell = cast(REBVAL*, cast(intptr_t, VAL_INT64(ARG(source))));
+    Value* source = p_cast(Value*, cast(intptr_t, VAL_INT64(ARG(SOURCE))));
 
-    Copy_Cell(D_OUT, cell);
-    return D_OUT;  // don't return `cell` (would do a rebRelease())
+    Copy_Cell(OUT, source);
+    return OUT;  // don't return `source` (would do a rebRelease())
 }
 
 
 //
 //  export set-at-pointer: native [
 //
-//  {Set the contents of a cell, e.g. one returned by ALLOC-VALUE-POINTER}
+//  "Set the contents of a cell, e.g. one returned by ALLOC-VALUE-POINTER"
 //
-//      return: "The value set to, or NULL if the set value is NULL"
-//          [<opt> any-value!]
+//      return: "The value that was set to"
+//          [any-value?]
 //      target "A pointer to a Rebol value"
 //          [integer!]
-//      value "Value to assign"
-//          [<opt> any-value!]
-//      /opt "Treat nulls as unsetting the target instead of an error"
+//      ^value "Value to assign"
+//          [any-value?]
+//      :any "Do not error on NOTHING! or TRIPWIRE!"
 //  ]
 //
-REBNATIVE(set_at_pointer)
+DECLARE_NATIVE(SET_AT_POINTER)
 //
 // !!! See notes on GET-AT-POINTER about keeping interface roughly compatible
 // with the SET native.
 {
-    FFI_INCLUDE_PARAMS_OF_SET_AT_POINTER;
+    INCLUDE_PARAMS_OF_SET_AT_POINTER;
 
-    REBVAL *v = ARG(value);
+    Value* v = Meta_Unquotify_Decayed(ARG(VALUE));
 
-    if (IS_NULLED(v) and not REF(opt))
-        fail (Error_No_Value(v));
+    if ((Is_Nothing(v) or Is_Tripwire(v)) and not Bool_ARG(ANY)) {
+        // !!! current philosophy is to allow all assignments
+    }
 
-    REBVAL *cell = cast(REBVAL*, cast(intptr_t, VAL_INT64(ARG(target))));
-    Copy_Cell(cell, v);
+    Value* target = p_cast(Value*, cast(intptr_t, VAL_INT64(ARG(TARGET))));
+    Copy_Cell(target, v);
 
-    RETURN (ARG(value));  // Returning cell would rebRelease()
+    return COPY(v);  // Returning target would rebRelease() it
+}
+
+
+//
+//  startup*: native [
+//
+//  "Startup FFI Extension"
+//
+//      return: [~]
+//  ]
+//
+DECLARE_NATIVE(STARTUP_P)
+{
+    INCLUDE_PARAMS_OF_STARTUP_P;
+
+    return NOTHING;
+}
+
+
+//
+//  shutdown*: native [
+//
+//  "Shutdown FFI Extensions"
+//
+//      return: [~]
+//  ]
+//
+DECLARE_NATIVE(SHUTDOWN_P)
+{
+    INCLUDE_PARAMS_OF_SHUTDOWN_P;
+
+    return NOTHING;
 }

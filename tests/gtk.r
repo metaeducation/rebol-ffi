@@ -1,22 +1,34 @@
 REBOL []
 
-recycle/torture
+recycle:torture
 
-libgtk: attempt [
-    make library! %libgtk-3.so
-] else [
-    make library! %libgtk-3.so.0
+=== LOCATE LIBRARIES ===
+
+libgtk: any [
+    try make library! %libgtk-3.so
+    try make library! %libgtk-3.so.0
+    fail "Couldn't find libgtk-3.so"
 ]
-libglib: attempt [
-    make library! %libglib-2.0.so
-] else [
-    make library! %libglib-2.0.so.0
+
+libglib: any [
+    try make library! %libglib-2.0.so
+    try make library! %libglib-2.0.so.0
+    fail "Couldn't find libglib-2.0.so"
 ]
-libgob: attempt [
-    make library! %libgobject-2.0.so
-] else [
-    make library! %libgobject-2.0.so.0
+
+libgob: any [
+    try make library! %libgobject-2.0.so
+    try make library! %libgobject-2.0.so.0
+    fail "Couldn't find libgobject-2.0.so"
 ]
+
+
+=== DEFINE GTK ROUTINE INTERFACES ===
+
+; This is a small subset of GTK definitions extracted for this demo.  The full
+; definitions of GTK are translated by a script:
+;
+;   https://github.com/metaeducation/c2r3
 
 gtk-init:
     make-routine libgtk "gtk_init" [
@@ -33,8 +45,8 @@ gtk-window-new:
 gtk-window-set-default-size:
     make-routine libgtk "gtk_window_set_default_size" [
         windown [pointer]
-        width    [int32]
-        height    [int32]
+        width [int32]
+        height [int32]
         return: [void]
     ]
 
@@ -122,7 +134,7 @@ g-signal-connect-data:
         instance [pointer]
         detailed-signal [pointer]
         c-handler [pointer]
-        data    [pointer]
+        data [pointer]
         destroy-data [pointer]
         connect-flags [int32]
         return: [int64]
@@ -132,9 +144,9 @@ g-signal-connect: func [
     instance [integer!]
     detailed-signal [integer! text! binary!]
     c-handler [action!]
-    data [<opt> integer!]
+    data [~null~ integer!]
 ][
-    g-signal-connect-data instance detailed-signal :c-handler :data 0 0
+    g-signal-connect-data instance detailed-signal c-handler/ data 0 0
 ]
 
 gtk-button-new-with-label:
@@ -152,11 +164,14 @@ gtk-button-set-label:
 gtk-container-add:
     make-routine libgtk "gtk_container_add" [
         container [pointer]
-        elem      [pointer]
+        elem [pointer]
     ]
 
+
+=== TEST APPLICATION ===
+
 init-gtk: function [app] [
-    arg0: make struct! compose/deep [
+    arg0: make struct! compose:deep [
         appn [uint8 [(1 + length of app)]]
     ]
     change arg0 append to binary! app #{00}
@@ -166,7 +181,7 @@ init-gtk: function [app] [
     ]
 
     print ["assign pointer"]
-    argv/args/1: addr-of arg0
+    argv.args.1: addr-of arg0
 
     print ["argv:" argv]
     argc: make struct! [
@@ -189,16 +204,16 @@ on-click-callback: make-callback [
     data   [pointer]
 ][
     print ["clicked"]
-    i: make struct! compose/deep [
+    i: make struct! compose:deep [
         [
             raw-memory: (data)
             raw-size: 4
-         ]
+        ]
         i [int32]
     ]
-    i/i: i/i + 1
+    i.i: i.i + 1
     gtk-button-set-label widget spaced [
-        "clicked" i/i either i/i = 1 ["time"]["times"]
+        "clicked" i.i (either i.i = 1 ["time"] ["times"])
     ]
 ]
 
@@ -218,7 +233,7 @@ win: gtk-window-new GTK_WINDOW_TOPLEVEL
 gtk-window-set-default-size win 10 10
 gtk-window-set-resizable win 1
 print ["win:" win]
-g-signal-connect win "destroy" :app-quit-callback NULL
+g-signal-connect win "destroy" app-quit-callback/ NULL
 gtk-window-set-title win "gtk+ from rebol"
 
 hbox: gtk-hbox-new
@@ -230,7 +245,7 @@ but1: gtk-button-new-with-label "button 1"
 gtk-box-pack-start hbox but1 1 1 0
 
 n-clicked: make struct! [i: [int32] 0]
-g-signal-connect but1 "clicked" :on-click-callback (addr-of n-clicked)
+g-signal-connect but1 "clicked" on-click-callback/ (addr-of n-clicked)
 
 but2: gtk-button-new-with-label "button 2"
 gtk-box-pack-start hbox but2 1 1 0

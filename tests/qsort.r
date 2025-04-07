@@ -2,7 +2,7 @@ Rebol [
     Title: "Callback demonstration for FFI extension: Quicksort"
     File: %qsort.r
 
-    Description: {
+    Description: --{
         qsort() is defined in the standard C library in <stdlib.h>.  It can be
         used to sort an array of arbitrary data by passing it a pointer to a
         C function which serves as the comparison operator.  Using only the
@@ -27,9 +27,9 @@ Rebol [
         Rebol function be called from C, with particular expectations of the
         C data types used to invoke it.  The parameter language and supported
         types used is the same as that in MAKE-ROUTINE.
-    }
+    }--
 
-    Notes: {
+    Notes: --{
         The C language does not have strict typing rules for the arguments
         to functions passed by pointer.  This means when a function takes a
         function pointer as an argument, there's not enough information in
@@ -41,34 +41,34 @@ Rebol [
         would be at odds with how the language may work.  e.g. another one
         of the function's parameters may dictate the choice of what type of
         parameter the callback receives.
-    }
+    }--
 
-    See-Also: {
+    See-Also: --{
         "user natives", which embed a TCC compiler into the Rebol
         executable.  This provides an alternative for those who would prefer
         to write their callbacks directly in C, yet still include that C
         source in a Rebol module.
-    }
+    }--
 ]
 
-recycle/torture
+recycle:torture
 
 f: function [
     a [integer!]
     b [integer!]
 ][
-    i: make struct! compose/deep [
+    i: make struct! compose:deep [
         [raw-memory: (a)]
         i [int32]
     ]
-    j: make struct! compose/deep [
+    j: make struct! compose:deep [
         [raw-memory: (b)]
         i [int32]
     ]
     case [
-        i/i = j/i [0]
-        i/i < j/i [-1]
-        i/i > j/i [1]
+        i.i = j.i [0]
+        i.i < j.i [-1]
+        i.i > j.i [1]
     ]
 ]
 
@@ -84,10 +84,10 @@ cb: wrap-callback :f [
 
 libc: make library! %libc.so.6
 
-x64?: 40 = fifth system/version
+x64?: 40 = fifth system.version
 size_t: either x64? ['int64]['int32]
 
-qsort: make-routine libc "qsort" compose/deep [
+qsort: make-routine libc "qsort" compose:deep [
     base [pointer]
     nmemb [(size_t)]
     size [(size_t)]

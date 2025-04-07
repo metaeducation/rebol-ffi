@@ -1,11 +1,54 @@
-REBOL []
+REBOL [
+    Name: FFI
+    Notes: "See %extensions/README.md for the format and fields of this file"
 
-name: 'FFI
+    Extended-Words: [
+        struct!
+        uint8 int8
+        uint16 int16
+        uint32 int32
+        uint64 int64
+        float
+        double
+        pointer
+        rebval
+        raw-memory raw-size
+        extern
+        varargs  ; used as the name of synthesized variadic argument
+    ]
 
-source: %ffi/mod-ffi.c
-depends: [
-    %ffi/t-struct.c
-    %ffi/t-routine.c
+    Extended-Types: [struct! library! vector!]
+]
+
+
+cflags: [
+    ; ffi_closure has an alignment specifier, which causes
+    ; padding, and MSVC warns about that.
+    ;
+    <msc:/wd4324>
+]
+
+includes: compose [
+    ;
+    ; Note: FFI once statically linked to `Trap_Find_Function_In_Library()`
+    ; in the LIBRARY! extension.  Now it uses librebol calls to execute
+    ; "make library! ..." etc., and gets POINTER! back.  So it does not
+    ; need to do that any longer
+    ;
+    (comment [make-file [(repo-dir) extensions/library /]])
+
+    ; Note: Vectors are used to model C array structures, and so you have
+    ; to have the vector extension available if you're going to do any FFI
+    ; with arrays.  But similar to the library extension, VECTOR! is now
+    ; accessed through API calls with HANDLE!.
+    ;
+    (comment [make-file [(repo-dir) extensions/vector /]])
+]
+
+sources: [
+    %mod-ffi.c
+    %t-struct.c
+    %t-routine.c
 ]
 
 comment [
@@ -42,38 +85,6 @@ comment [
             "not" (user-config/with-ffi)
         ]
     ]
-]
-
-includes: compose [
-    %prep/extensions/ffi/
-
-    ; For the FFI to be used, you pretty much require the ability to load a
-    ; DLL or shared library.  Currently the `Find_Function()` API is linked
-    ; statically (as opposed to making a libRebol call to the LIBRARY! and
-    ; giving it a text string, getting back a HANDLE! from which a C function
-    ; pointer can be extracted).  Hence headers must be directly included.
-    ; But that could be changed.
-    ;
-    (make-file [(repo-dir) extensions/library /])
-
-    ; Vectors are used to model C array structures, and thus for the moment
-    ; one must build the vector extension into the executable if you want
-    ; FFI support.  This could be decoupled as an option, but the base demos
-    ; (like %qsort.r) depend upon it.  Similarly to the issue of static link
-    ; of the LIBRARY! extension, it could be possible (if VECTOR! exported it)
-    ; to do this via libRebol, asking for a HANDLE! memory pointer for the
-    ; vector...but for now we go through the internal includes of the type.
-    ;
-    (make-file [(repo-dir) extensions/vector /])
-]
-
-definitions: []
-
-cflags: [
-    ; ffi_closure has an alignment specifier, which causes
-    ; padding, and MSVC warns about that.
-    ;
-    <msc:/wd4324>
 ]
 
 searches: []

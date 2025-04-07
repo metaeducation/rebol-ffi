@@ -1,6 +1,6 @@
 REBOL []
 
-recycle/torture
+recycle:torture
 
 libc: switch fourth system/version [
     3 [
@@ -62,4 +62,4 @@ len: (sprintf
     "world" [pointer]
 )
 
-print ["5. h:" copy/part to text! values of h len]
+print ["5. h:" copy:part to text! values of h len]

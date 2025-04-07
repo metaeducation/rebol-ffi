@@ -2,11 +2,10 @@ REBOL [
     Title: "FFI Extension"
     Name: FFI
     Type: Module
-    Options: [isolate]
     Version: 1.0.0
-    License: {Apache 2.0}
+    License: "Apache 2.0"
 
-    Notes: {
+    Notes: --{
         The FFI was not initially implemented with any usermode code.  But
         just as with the routines in the SYS context, there's opportunity for
         replacing some of the non-performance-critical C that does parsing and
@@ -14,17 +13,7 @@ REBOL [
         to use fewer specialized structures to represent ROUTINE! and
         STRUCT!, instead using arrays...to permit it to be factored into an
         extension.
-    }
-]
-
-; !!! Should call UNREGISTER-STRUCT-HOOKS at some point (module finalizer?)
-;
-register-struct-hooks [
-    change: generic [
-        return: [struct!]
-        series [struct!]
-        value [<opt> any-value!]
-    ]
+    }--
 ]
 
 ffi-type-mappings: [
@@ -46,20 +35,20 @@ ffi-type-mappings: [
     ;
     pointer [integer! text! binary! vector! action!]
 
-    rebval [any-value!]
+    rebval [any-value?]
 
     ; ...struct...
 ]
 
 
-make-callback: function [
-    {Helper for WRAP-CALLBACK that auto-generates the action to be wrapped}
+export make-callback: function [
+    "Helper for WRAP-CALLBACK that auto-generates the action to be wrapped"
 
     return: [action!]
     args [block!]
     body [block!]
-    /fallback "If untrapped failure occurs during callback, return value"
-        [any-value!]
+    :fallback "If untrapped failure occurs during callback, return value"
+        [any-value?]
 ][
     r-args: copy []
 
@@ -99,7 +88,7 @@ make-callback: function [
 
     safe: function r-args
         (if fallback [
-            compose/deep <$> [
+            compose2:deep <$> [
                 trap [return ((<$> as group! body))] then (error -> [
                     print "** TRAPPED CRITICAL ERROR DURING FFI CALLBACK:"
                     print mold error
@@ -118,7 +107,5 @@ make-callback: function [
         end
     ]
 
-    wrap-callback :safe args
+    wrap-callback safe/ args
 ]
-
-sys/export [make-callback]
