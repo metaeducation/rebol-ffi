@@ -25,7 +25,8 @@
 #include "sys-core.h"
 #include "tmp-mod-ffi.h"
 
-#include "reb-struct.h"
+#include <ffi.h>
+#include "stub-struct.h"
 
 
 // The managed HANDLE! for a ffi_type will have a reference in structs that
@@ -1553,3 +1554,76 @@ IMPLEMENT_GENERIC(VALUES_OF, Is_Struct)
         return Init_Block(D_OUT, Struct_To_Array(Cell_Struct(val)));
     }
 */
+
+
+//
+//  export make-similar-struct: native [
+//
+//  "Create a STRUCT! that reuses the underlying spec of another STRUCT!"
+//
+//      return: [struct!]
+//      spec "Struct with interface to copy"
+//          [struct!]
+//      body "keys and values defining instance contents (bindings modified)"
+//          [block! any-context? blank!]
+//  ]
+//
+DECLARE_NATIVE(MAKE_SIMILAR_STRUCT)
+//
+// !!! Compatibility for `MAKE some-struct [...]` from Atronix R3.  There
+// isn't any real "inheritance management" for structs, but it allows the
+// re-use of the structure's field definitions, so it is a means of saving on
+// memory (?)  Code retained for examination.
+{
+    INCLUDE_PARAMS_OF_MAKE_SIMILAR_STRUCT;
+
+    Element* spec = Element_ARG(SPEC);
+    Element* body = Element_ARG(BODY);
+
+    Init_Struct(OUT, Copy_Struct_Managed(Cell_Struct(spec)));
+
+    Option(Error*) e = Trap_Init_Struct_Fields(OUT, body);
+    if (e)
+        return FAIL(unwrap e);
+
+    return OUT;
+}
+
+
+//
+//  export destroy-struct-storage: native [
+//
+//  "Destroy the external memory associated the struct"
+//
+//      return: [~]
+//      struct [struct!]
+//      :free "Specify the function to free the memory"
+//          [action!]  ; [1]
+//  ]
+//
+DECLARE_NATIVE(DESTROY_STRUCT_STORAGE)
+//
+// 1. This used to constrain the FREE function to being ROUTINE!.  But if
+//    a function takes a pointer, then it seems that it should a candidate
+//    for performing the free.
+{
+    INCLUDE_PARAMS_OF_DESTROY_STRUCT_STORAGE;
+
+    if (Is_Blob(Struct_Storage(Cell_Struct(ARG(STRUCT)))))
+        return FAIL("Can't use external storage with DESTROY-STRUCT-STORAGE");
+
+    Element* handle = Struct_Storage(Cell_Struct(ARG(STRUCT)));
+
+    DECLARE_ELEMENT (pointer);
+    Init_Integer(pointer, i_cast(intptr_t, Cell_Handle_Pointer(void, handle)));
+
+    if (Cell_Handle_Len(handle) == 0)
+        return FAIL("DESTROY-STRUCT-STORAGE given already destroyed handle");
+
+    CELL_HANDLE_LENGTH_U(handle) = 0;  // !!! assert correct for mem block size
+
+    if (Bool_ARG(FREE))
+        rebElide(rebRUN(ARG(FREE)), pointer);  // may not be routine [1]
+
+    return NOTHING;
+}
