@@ -41,6 +41,35 @@ ffi-type-mappings: [
 ]
 
 
+; The idea of MAKE-CALLBACK is to allow you to write something like:
+;
+;     callback: make-callback [
+;         return: [int64]
+;         a [pointer]
+;         b [pointer]
+;     ][
+;         ; body of function, Rebol code
+;     ]
+;
+; And it will produce an ACTION! with legal Rebol types, e.g.
+;
+;     temp: function [
+;         return: [integer!]
+;         a [integer!]
+;         b [integer!]
+;     ][
+;         ; body of function, Rebol code
+;     ]
+;
+; Then it will wrap that callback up with the FFI interface:
+;
+;     wrap-callback temp/ [return: [int64] a [pointer] b [pointer]]
+;
+; So it just saves you the extra step.
+;
+; (At time of writing it does not map the types, it just creates the function
+; with no types, e.g. (function [a b] [...]), but that's easy enough.)
+;
 export make-callback: function [
     "Helper for WRAP-CALLBACK that auto-generates the action to be wrapped"
 
@@ -50,13 +79,13 @@ export make-callback: function [
     :fallback "If untrapped failure occurs during callback, return value"
         [any-value?]
 ][
-    r-args: copy []
+    let r-args: copy []
 
     ; !!! TBD: Use type mappings to mark up the types of the Rebol arguments,
     ; so that HELP will show useful types.
     ;
-    arg-rule: [
-        copy a word! (append r-args a)
+    let arg-rule: [
+        let a: word! (append r-args a)
         block!
         opt text!
     ]
@@ -68,44 +97,56 @@ export make-callback: function [
     ; Better to just FAIL during the MAKE-CALLBACK call so the interpreter
     ; does not crash.
     ;
-    attr-rule: [
-        set-word! block!
+    let attr-rule: [
+        set-word?/ block!
             |
         word!
             |
-        copy a [tag! some word!] (append r-args a)
+        a: across [tag! some word!] (append r-args spread a)
     ]
 
     parse args [
         opt text!
-        any [arg-rule | attr-rule]
-        end
-    ] else [
+        opt some [arg-rule | attr-rule]
+        <end>
+    ] except [
         fail ["Unrecognized pattern in MAKE-CALLBACK function spec" args]
     ]
 
-    ; print ["args:" mold args]
+    comment [
+        print ["r-args:" mold r-args]
+    ]
 
-    safe: function r-args
+    ; Wrapping process is a bit more complex in modern binding, because the
+    ; block we get is already bound, and we need some mechanism to invasively
+    ; "overbind" it or it will not see the function's arguments:
+    ;
+    ; https://rebol.metaeducation.com/t/func-variant-that-auto-returns/2124
+    ;
+    let safe: function r-args
         (if fallback [
-            compose2:deep <$> [
-                trap [return ((<$> as group! body))] then (error -> [
+            compose2:deep @{} inside body '[
+                trap [return {as group! bindable body}] then error -> [
                     print "** TRAPPED CRITICAL ERROR DURING FFI CALLBACK:"
                     print mold error
-                    ((<$> fallback))
-                ])
+                    return {^fallback}
+                ]
             ]
         ] else [
             body
         ])
 
-    parse args [
-        while [
+    parse args [  ; !!! remove all the locals?
+        opt some [
             remove [tag! some word!]
-            | skip
+            | one
         ]
-        end
+        <end>
     ]
 
-    wrap-callback safe/ args
+    comment [
+        print ["args:" mold args]
+    ]
+
+    return wrap-callback safe/ args
 ]
