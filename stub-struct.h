@@ -185,11 +185,14 @@ INLINE bool Field_Is_Struct(StructField* f) {
 //    having the client branch on Field_Is_Struct() is better than returning
 //    SYM_STRUCT_X.
 //
-INLINE SymId Field_Type_Id(StructField* f) {
+INLINE const Symbol* Field_Type_Symbol(StructField* f) {
     assert(not Field_Is_Struct(f));  // better than returning SYM_STRUCT_X [1]
     assert(Is_Word(Field_Detail(f, IDX_FIELD_TYPE)));
-    return unwrap Cell_Word_Id(Field_Detail(f, IDX_FIELD_TYPE));
+    return Cell_Word_Symbol(Field_Detail(f, IDX_FIELD_TYPE));
 }
+
+#define Field_Type_Id(f) \
+    (unwrap Cell_Word_Id(Field_Detail((f), IDX_FIELD_TYPE)))
 
 INLINE Source* Field_Subfields_Array(StructField* f) {
     assert(Field_Is_Struct(f));

@@ -171,10 +171,7 @@ Source* Struct_To_Array(StructInstance* stu)
         else {
             // Elemental type (from a fixed list of known C types)
             //
-            Init_Word(
-                Alloc_Tail_Array(typespec),
-                Canon_Symbol(Field_Type_Id(field))
-            );
+            Init_Word(Alloc_Tail_Array(typespec), Field_Type_Symbol(field));
         }
 
         // "optional dimension and initialization."
@@ -187,13 +184,17 @@ Source* Struct_To_Array(StructInstance* stu)
             // Dimension becomes INTEGER! in a BLOCK! (to look like a C array)
             //
             REBLEN dimension = Field_Dimension(field);
-            Source* one_int = Alloc_Singular(NODE_FLAG_MANAGED);
+            Source* one_int = Alloc_Singular(
+                FLAG_FLAVOR(SOURCE) | NODE_FLAG_MANAGED
+            );
             Init_Integer(Stub_Cell(one_int), dimension);
             Init_Block(Alloc_Tail_Array(typespec), one_int);
 
             // Initialization seems to be just another block after that (?)
             //
             Source* init = Make_Source(dimension);
+            Set_Flex_Len(init, dimension);
+
             REBLEN n;
             for (n = 0; n < dimension; n ++) {
                 DECLARE_VALUE (scalar);
@@ -202,7 +203,6 @@ Source* Struct_To_Array(StructInstance* stu)
                     fail ("Can't put antiform in block for Struct_To_Array()");
                 Copy_Cell(Array_At(init, n), cast(Element*, scalar));
             }
-            Set_Flex_Len(init, dimension);
             Init_Block(Alloc_Tail_Array(typespec), init);
         }
         else {
@@ -1193,6 +1193,7 @@ Option(Error*) Trap_Make_Struct(Sink(Element) out, const Element* arg)
             Corrupt_If_Debug(at);
         }
         else {
+            Erase_Cell(init);
             if (Eval_Step_Throws(init, L))
                 return Error_No_Catch_For_Throw(TOP_LEVEL);
         }
@@ -1377,6 +1378,7 @@ IMPLEMENT_GENERIC(PICK, Is_Struct)
 
         REBLEN dimension = Field_Dimension(field);
         Source* arr = Make_Source(dimension);  // return VECTOR! instead? [1]
+        Set_Flex_Len(arr, dimension);
         REBLEN n;
         for (n = 0; n < dimension; ++n) {
             DECLARE_VALUE (scalar);
@@ -1385,7 +1387,6 @@ IMPLEMENT_GENERIC(PICK, Is_Struct)
                 return FAIL("Antiforms can't be put in block for PICK");
             Copy_Cell(Array_At(arr, n), Known_Element(scalar));
         }
-        Set_Flex_Len(arr, dimension);
 
         return Init_Block(OUT, arr);
     }
@@ -1421,6 +1422,27 @@ IMPLEMENT_GENERIC(POKE, Is_Struct)
             Option(Error*) e = Trap_Set_Scalar_In_Struct(stu, field, 0, poke);
             if (e)
                 return FAIL(unwrap e);
+            return nullptr;  // no need to write back
+        }
+
+        if (Is_Blob(poke)) {
+            if (Field_Width(field) != 1)
+                return FAIL(
+                    "Setting array field to BLOB! requires element width of 1"
+                );
+            Size size;
+            const Byte* bytes = Cell_Blob_Size_At(&size, poke);
+            if (Field_Dimension(field) != size)
+                return FAIL(
+                    "Setting field to BLOB! requires equal size (for now)"
+                );
+
+            Byte* dest =
+                Struct_Data_Head(stu)
+                + STRUCT_OFFSET(stu)
+                + Field_Offset(field);
+
+            memcpy(dest, bytes, size);
             return nullptr;  // no need to write back
         }
 

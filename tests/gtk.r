@@ -1,4 +1,27 @@
-REBOL []
+REBOL [
+    Title: "Small GTK3 Smoke Test"
+    Author: "Shixin Zeng"
+
+    Description: --{
+        This is a minimal GTK3 test, just enough to bring up a window and
+        show it counting when you click a button.
+
+        Shixin demonstrated a fuller GTK3 application based on an automated
+        import of GTK's interfaces at the 2019 conference:
+
+          https://youtu.be/fMeTqPyrNF4?t=1259
+    }--
+
+    Notes: --{
+      * GTK4 was released in late 2020, but GTK3 is still in wide use by major
+        projects in 2025 with no pressing plans to migrate, e.g. Chrome,
+        Firefox, Inkscape, GIMP, and Handbrake.
+
+      * GTK3 integer/boolean types are 32-bit by design, to keep API/ABI
+        stability across platforms and ensure consistent behavior between
+        32-bit and 64-bit systems.
+    }--
+]
 
 recycle:torture
 
@@ -70,6 +93,8 @@ gtk-widget-show:
 
 gtk-hbox-new:
     make-routine libgtk "gtk_hbox_new" [
+        homogeneous [int32]  ; gboolean, but FFI likely maps that to int
+        spacing [int32]
         return: [pointer]
     ]
 
@@ -168,27 +193,65 @@ gtk-container-add:
     ]
 
 
-=== TEST APPLICATION ===
+=== GTK INIT HELPER ===
+
+; The GTK3 initialization function takes an optional ARGC and an ARGV, for the
+; purpose of slipstreaming GTK settings from your command line into GTK's
+; behavior.
+;
+; It scans for GTK-specific arguments (like --gtk-debug, --display, --sync),
+; and removes them from the argument list. That way, your program can still
+; process its own command-line arguments after GTK has had a chance to look at
+; and remove the ones it cares about.
+;
+; GTK modifies argc and argv in-place. For example, if argv originally had 5
+; arguments, and GTK consumed 2 of them, the remaining list will contain 3
+; arguments (and argc will be updated accordingly).  It does not free any
+; memory and will only reduce the count of argc and remove pointers from
+; the argv array.
+;
+; GTK4 operates completely differently.  There is no gtk_init() function.
+;
+; So we could ignore this and pass nulls, the original script passed pointers
+; to argv and argc, so that's kept to show at least one way of doing this.
+; It also allows us to pass "--gtk-debug".
 
 init-gtk: function [app] [
-    arg0: make struct! compose:deep [
+    let arg0: make struct! compose:deep [
         appn [uint8 [(1 + length of app)]]
     ]
-    change arg0 append to binary! app #{00}
+    arg0.appn: append (encode 'UTF-8 app) #{00}
 
-    argv: make struct! [
-        args [pointer [2]]
+    let flag: "--gtk-debug"
+    let arg1: make struct! compose:deep [
+        flagn [uint8 [(1 + length of flag)]]
+    ]
+    arg1.flagn: append (encode 'UTF-8 flag) #{00}
+
+    let argv: make struct! [
+        args [pointer [3]]  ; C standard requires null termination
     ]
 
-    print ["assign pointer"]
+    ; !!! At time of writing this is broken.  argv.args returns a BLOCK! that
+    ; gets synthesized from the values.  But then (argv.args).1: winds up
+    ; doing an assignment into that transient block, which does not affect
+    ; the original data.  This concept of "subcell addressing" is likely best
+    ; addressed by making the VECTOR! type able to map directly onto the
+    ; FFI memory as the pick step... though it would have to be fixed-size
+    ; and prohibit expansions/etc.
+    ;
+    print ["assigning pointers:" (address of arg0) (address of arg1)]
+    print ["arg.args is:" mold argv.args]
     argv.args.1: address of arg0
+    argv.args.2: address of arg1
+    argv.args.3: 0
 
     print ["argv:" argv]
-    argc: make struct! [
+    let argc: make struct! [
         c: [int32] 1
     ]
 
-    addr-argv: make struct! [
+    let addr-argv: make struct! [
         addr: [pointer] (address of argv)
     ]
 
@@ -199,12 +262,15 @@ init-gtk: function [app] [
     print ["argc:" argc "argv:" argv]
 ]
 
+
+=== TEST APPLICATION ===
+
 on-click-callback: make-callback [
     widget [pointer]
     data   [pointer]
 ][
     print ["clicked"]
-    i: make struct! compose:deep [
+    let i: make struct! compose:deep [
         [
             raw-memory: (data)
             raw-size: 4
@@ -226,7 +292,7 @@ app-quit-callback: make-callback [
 GTK_WINDOW_TOPLEVEL: 0
 GTK_WINDOW_POPUP: 1
 
-init-gtk "./r3-view-linux"
+init-gtk system.options.boot
 print ["gtk initialized"]
 
 win: gtk-window-new GTK_WINDOW_TOPLEVEL
@@ -236,13 +302,14 @@ print ["win:" win]
 g-signal-connect win "destroy" app-quit-callback/ NULL
 gtk-window-set-title win "gtk+ from rebol"
 
-hbox: gtk-hbox-new
+hbox: gtk-hbox-new 0 0  ; could pass spacing here
 gtk-box-set-spacing hbox 10
 
 gtk-container-add win hbox
 
 but1: gtk-button-new-with-label "button 1"
 gtk-box-pack-start hbox but1 1 1 0
+print ["hbox spacing:" gtk-box-get-spacing hbox]
 
 n-clicked: make struct! [i: [int32] 0]
 g-signal-connect but1 "clicked" on-click-callback/ (address of n-clicked)
@@ -253,9 +320,11 @@ gtk-box-pack-start hbox but2 1 1 0
 but3: gtk-toggle-button-new-with-label "toggle"
 gtk-box-pack-start hbox but3 1 1 0
 
-;font-chooser: gtk-font-chooser-widget-new
-;gtk-box-pack-start hbox font-chooser 1 1 0
-;gtk-font-chooser-set-font font-chooser "Times Bold 18"
+comment [  ; larger font chooser, presumably commented out for being too big
+    font-chooser: gtk-font-chooser-widget-new
+    gtk-box-pack-start hbox font-chooser 1 1 1  ; last flag is expand/fill
+    gtk-font-chooser-set-font font-chooser "Times Bold 18"
+]
 
 font-button: gtk-font-button-new
 gtk-box-pack-start hbox font-button 1 1 0
@@ -270,5 +339,4 @@ gtk-widget-show but2
 gtk-widget-show but3
 gtk-widget-show hbox
 gtk-widget-show win
-print ["spacing:" gtk-box-get-spacing hbox]
 gtk-main
