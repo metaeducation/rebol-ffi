@@ -131,24 +131,24 @@ enum {
     //
     // https://gcc.gnu.org/onlinedocs/gcc-4.7.2/gcc/Unnamed-Fields.html
     //
-    IDX_FIELD_NAME = 0,
+    IDX_FIELD_NAME = 0,  // !!! IDX_XXX values typically start at 1, not 0
 
     // WORD! type symbol or a BLOCK! of fields if this is a struct.  Symbols
     // generally map to FFI_TYPE_XXX constant (e.g. UINT8) but may also
     // be a special extension, such as REBVAL.
     //
-    IDX_FIELD_TYPE = 1,
+    IDX_FIELD_TYPE,
 
     // An INTEGER! of the array dimensionality, or BLANK! if not an array.
     //
-    IDX_FIELD_DIMENSION = 2,
+    IDX_FIELD_DIMENSION,
 
     // HANDLE! to the ffi_type* representing this entire field.  If it's a
     // premade ffi_type then it's a simple HANDLE! with no GC participation.
     // If it's a struct then it will use the shared form of HANDLE!, which
     // will GC the memory pointed to when the last reference goes away.
     //
-    IDX_FIELD_FFTYPE = 3,
+    IDX_FIELD_FFTYPE,
 
     // An INTEGER! of the offset this field is relative to the beginning
     // of its entire containing structure.  Will be BLANK! if the structure
@@ -156,13 +156,13 @@ enum {
     //
     // !!! Comment said "size is limited by struct->offset, so only 16-bit"?
     //
-    IDX_FIELD_OFFSET = 4,
+    IDX_FIELD_OFFSET,
 
     // An INTEGER! size of an individual field element ("wide"), in bytes.
     //
-    IDX_FIELD_WIDE = 5,
+    IDX_FIELD_WIDE,
 
-    IDX_FIELD_MAX
+    MAX_IDX_FIELD = IDX_FIELD_WIDE
 };
 
 #define Field_Detail(a,n) \

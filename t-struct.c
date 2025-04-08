@@ -1031,14 +1031,14 @@ Option(Error*) Trap_Make_Struct(Sink(Element) out, const Element* arg)
     //    offset was 0, the question would be "offset 0 into what?" because
     //    the struct itself is not a member of an aggregate.
 
-    StructField* schema = Make_Source(IDX_FIELD_MAX);
+    StructField* schema = Make_Source(MAX_IDX_FIELD + 1);
+    Set_Flex_Len(schema, MAX_IDX_FIELD + 1);
     Init_Unreadable(Field_Detail(schema, IDX_FIELD_TYPE));  // will fill in
     Init_Blank(Field_Detail(schema, IDX_FIELD_DIMENSION));  // not used [1]
     Init_Unreadable(Field_Detail(schema, IDX_FIELD_FFTYPE));  // will fill in
     Init_Blank(Field_Detail(schema, IDX_FIELD_NAME));  // no symbol for structs
     Init_Blank(Field_Detail(schema, IDX_FIELD_OFFSET));  // not used [2]
     Init_Unreadable(Field_Detail(schema, IDX_FIELD_WIDE));  // will fill in
-    Set_Flex_Len(schema, IDX_FIELD_MAX);
 
   process_fields: ////////////////////////////////////////////////////////////
 
@@ -1109,14 +1109,14 @@ Option(Error*) Trap_Make_Struct(Sink(Element) out, const Element* arg)
 
     const Element* at = At_Level(L);
 
-    StructField* field = Make_Source(IDX_FIELD_MAX);  // don't manage [1]
+    StructField* field = Make_Source(MAX_IDX_FIELD + 1);  // don't manage [1]
+    Set_Flex_Len(field, MAX_IDX_FIELD + 1);
     Init_Unreadable(Field_Detail(field, IDX_FIELD_TYPE));
     Init_Unreadable(Field_Detail(field, IDX_FIELD_DIMENSION));
     Init_Unreadable(Field_Detail(field, IDX_FIELD_FFTYPE));
     Init_Unreadable(Field_Detail(field, IDX_FIELD_NAME));
     Init_Integer(Field_Detail(field, IDX_FIELD_OFFSET), offset);
     Init_Unreadable(Field_Detail(field, IDX_FIELD_WIDE));
-    Set_Flex_Len(field, IDX_FIELD_MAX);
 
     bool expect_init;
     if (Is_Set_Word(at)) {  // Set-words initialize

@@ -25,71 +25,71 @@
 typedef Details RoutineDetails;
 
 enum {
-    // The HANDLE! of a CFUNC*, obeying the interface of the C-format call.
-    // If it's a routine, then it's the pointer to a pre-existing function
-    // in the DLL that the routine intends to wrap.  If a callback, then
-    // it's a fabricated function pointer returned by ffi_closure_alloc,
-    // which presents the "thunk"...a C function that other C functions can
-    // call which will then delegate to Rebol to call the wrapped ACTION!.
+    // HANDLE! of a CFunction*, obeying the interface of the C-format call.
     //
-    // Additionally, callbacks poke a data pointer into the HANDLE! with
-    // ffi_closure*.  (The closure allocation routine gives back a void* and
-    // not an ffi_closure* for some reason.  Perhaps because it takes a
+    // For routines, then it's the pointer to a pre-existing function in the
+    // DLL that the routine intends to wrap.
+    //
+    // For callbacks, then it's a fabricated function pointer returned by
+    // ffi_closure_alloc() which presents the "thunk"...a C function that
+    // other C functions can call which will then delegate to Rebol to call
+    // the wrapped ACTION!.  (The closure allocation routine gives back a void*
+    // and not an ffi_closure* for some reason.  Perhaps because it takes a
     // size that might be bigger than the size of a closure?)
     //
-    IDX_ROUTINE_CFUNC = 0,
+    IDX_ROUTINE_CFUNC = 1,
 
     // An INTEGER! indicating which ABI is used by the CFUNC (enum ffi_abi)
     //
     // !!! It would be better to change this to use a WORD!, especially if
     // the routine descriptions will ever become user visible objects.
     //
-    IDX_ROUTINE_ABI = 1,
+    IDX_ROUTINE_ABI,
 
     // The LIBRARY! the CFUNC* lives in if a routine, or the ACTION! to
     // be called if this is a callback.
     //
-    IDX_ROUTINE_ORIGIN = 2,
+    IDX_ROUTINE_ORIGIN,
 
     // The "schema" of the return type.  This is either a WORD! (which
     // is a symbol corresponding to the FFI_TYPE constant of the return) or
     // a BLOCK! representing a field (this REBFLD will hopefully become
     // OBJECT! at some point).  If it is BLANK! then there is no return type.
     //
-    IDX_ROUTINE_RET_SCHEMA = 3,
+    IDX_ROUTINE_RET_SCHEMA,
 
     // An ARRAY! of the argument schemas; each also WORD! or ARRAY!, following
     // the same pattern as the return value...but not allowed to be blank
     // (no such thing as a void argument)
     //
-    IDX_ROUTINE_ARG_SCHEMAS = 4,
+    IDX_ROUTINE_ARG_SCHEMAS,
 
     // A HANDLE! containing one ffi_cif*, or BLANK! if variadic.  The Call
     // InterFace (CIF) for a C function with fixed arguments can be created
     // once and then used many times.  For a variadic routine, it must be
     // created on each call to match the number and types of arguments.
     //
-    IDX_ROUTINE_CIF = 5,
+    IDX_ROUTINE_CIF,
 
     // A HANDLE! which is actually an array of ffi_type*, so a C array of
     // pointers.  This array was passed into the CIF at its creation time,
     // and it holds references to them as long as you use that CIF...so this
     // array must survive as long as the CIF does.  BLANK! if variadic.
     //
-    IDX_ROUTINE_ARG_FFTYPES = 6,
+    IDX_ROUTINE_ARG_FFTYPES,
 
     // A LOGIC! of whether this routine is variadic.  Since variadic-ness is
     // something that gets exposed in the ACTION! interface itself, this
     // may become redundant as an internal property of the implementation.
     //
-    IDX_ROUTINE_IS_VARIADIC = 7,
+    IDX_ROUTINE_IS_VARIADIC,
 
     // ffi_closure which for a callback stores the place where the CFunction*
     // lives, or BLANK! if the routine does not have a callback interface.
     //
-    IDX_ROUTINE_CLOSURE = 8,
+    IDX_ROUTINE_CLOSURE,
 
-    IDX_ROUTINE_MAX
+    MAX_IDX_ROUTINE = IDX_ROUTINE_CLOSURE
 };
 
 #define Routine_At(a,n)  Details_At((r), (n))
