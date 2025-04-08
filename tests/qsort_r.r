@@ -1,5 +1,6 @@
 REBOL [
-    Title: "Demo tunneling of REBVAL* through routine to callback in FFI"
+    Title: "Demo tunneling of Cell* through routine to callback in FFI"
+
     Description: --{
         There are two versions of quicksort in the C library.  Plain `qsort`
         is written in such a way that if your comparator needs any information
@@ -9,10 +10,10 @@ REBOL [
         state information and thus eliminate the requirement to use global
         variables for any parameterization of the comparator.
 
-        This demonstrates the use of the FFI argument type of REBVAL.
+        This demonstrates the use of the FFI argument type of a value Cell.
         While the purpose of the FFI is to talk to libraries that likely
         are not linked to any Rebol APIs (and hence would not be able to
-        make use of a REBVAL), this shows the use of it to "tunnel" a
+        make use of a Cell), this shows the use of it to "tunnel" a
         Rebol value through to a written-in-Rebol comparator callback.
     }--
 
@@ -32,27 +33,31 @@ cb: make-callback:fallback [
     b [pointer]
     arg [rebval]
 ][
+    print ["Inside cb:" a, b, mold arg]
+
     assert [integer? a]
     assert [integer? b]
+    assert [tag? arg]
 
     comment [
         fail "testing fallback behavior"
     ]
 
-    print mold arg
-
-    i: make struct! compose:deep [
+    let ai: make struct! compose:deep [
         [raw-memory: (a)]
         i [int32]
     ]
-    j: make struct! compose:deep [
+    let bi: make struct! compose:deep [
         [raw-memory: (b)]
         i [int32]
     ]
-    case [
-        i.i = j.i [0]
-        i.i < j.i [-1]
-        i.i > j.i [1]
+    return case [
+        ai.i = bi.i [0]
+        ai.i < bi.i [-1]
+        <default> [
+            assert [ai.i > bi.i]
+            <- 1
+        ]
      ]
 ] 0
 

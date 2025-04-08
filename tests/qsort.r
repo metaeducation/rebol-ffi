@@ -57,18 +57,22 @@ f: function [
     a [integer!]
     b [integer!]
 ][
-    i: make struct! compose:deep [
+    print ["Inside f:" a b]
+    let ai: make struct! compose:deep [
         [raw-memory: (a)]
         i [int32]
     ]
-    j: make struct! compose:deep [
+    let bi: make struct! compose:deep [
         [raw-memory: (b)]
         i [int32]
     ]
-    case [
-        i.i = j.i [0]
-        i.i < j.i [-1]
-        i.i > j.i [1]
+    return case [
+        ai.i = bi.i [0]
+        ai.i < bi.i [-1]
+        <default> [
+            assert [ai.i > bi.i]
+            <- 1
+        ]
     ]
 ]
 
@@ -76,7 +80,7 @@ f: function [
 ; function and wraps it in one step).  This is in order to be easier to
 ; debug if something is going wrong.
 ;
-cb: wrap-callback :f [
+/cb: wrap-callback f/ [
     return: [int64]
     a [pointer]
     b [pointer]
@@ -85,7 +89,7 @@ cb: wrap-callback :f [
 libc: make library! %libc.so.6
 
 x64?: 40 = fifth system.version
-size_t: either x64? ['int64]['int32]
+size_t: either x64? ['int64] ['int32]
 
 qsort: make-routine libc "qsort" compose:deep [
     base [pointer]

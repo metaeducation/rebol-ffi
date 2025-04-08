@@ -223,7 +223,7 @@ INLINE REBLEN Field_Total_Size(StructField* f) {
     return Field_Width(f);
 }
 
-INLINE ffi_type* SCHEMA_FFTYPE(const Element* schema) {
+INLINE ffi_type* Schema_Ffi_Type(const Element* schema) {
     if (Is_Block(schema)) {
         StructField* field = Cell_Array_Known_Mutable(schema);
         return Field_Ffi_Type(field);

@@ -148,15 +148,9 @@ static Option(Error*) Trap_Make_Schema_From_Block(
     Sink(Element) schema_out,  // => INTEGER! or HANDLE! for struct
     Option(Sink(Element)) param_out,  // => parameter for use in ACTION!s
     const Element* block,
-    Option(const Symbol*) symbol  // could be used in error reporting
+    const Symbol* symbol  // could be used in error reporting
 ){
     UNUSED(symbol);  // not currently used
-
-    if (not symbol)
-        assert(param_out);
-    else {
-        assert(not param_out);
-    }
 
     assert(Is_Block(block));
     if (Cell_Series_Len_At(block) == 0)
@@ -299,7 +293,7 @@ static Option(Error*) Trap_Cell_To_Ffi(
     const Value* arg,
     const Element* schema,
     Option(const Symbol*) label,
-    Option(const Key*) opt_key,
+    const Key* key,  // may be RETURN (not actually a named argument)
     const Param* param
 ){
     // Only one of dest or store should be non-nullptr.  This allows to write
@@ -307,20 +301,6 @@ static Option(Error*) Trap_Cell_To_Ffi(
     // that will expand enough to accommodate the data (store).
     //
     assert(store == nullptr ? dest != nullptr : dest == nullptr);
-
-  #if RUNTIME_CHECKS
-    //
-    // If the value being converted has a "name"--e.g. the FFI Routine
-    // interface named it in the spec.
-    //
-    // !!! Shouldn't the argument have already had its type checked by the
-    // calling process?
-    //
-    if (opt_key)
-        assert(arg != nullptr);
-    else
-        assert(arg == nullptr);  // return value, just make space (no arg)
-  #endif
 
     if (dest == nullptr)
         *offset_out = 0;
@@ -363,19 +343,17 @@ static Option(Error*) Trap_Cell_To_Ffi(
         // because it couldn't do so in the return case where arg was null)
 
         if (not Is_Struct(arg))
-            return Error_Arg_Type(label, unwrap opt_key, param, arg);
+            return Error_Arg_Type(label, key, param, arg);
 
         Size size = Struct_Storage_Len(Cell_Struct(arg));
         if (size != Field_Width(top))
-            return Error_Arg_Type(label, unwrap opt_key, param, arg);
+            return Error_Arg_Type(label, key, param, arg);
 
         memcpy(dest, Cell_Struct_Data_At(arg), size);
 
         Term_Binary_Len(store, *offset_out + size);
         return nullptr;  // no error
     }
-
-    const Key* key = unwrap opt_key;  // make easier to use below
 
     assert(Is_Word(schema));
 
@@ -521,10 +499,12 @@ static Option(Error*) Trap_Cell_To_Ffi(
 
           case TYPE_ACTION: {
             if (not Is_Action_Routine(arg))
-                return Error_Only_Callback_Ptr_Raw();  // but routines, too
+                return Error_User(  // but routines, too?
+                    "Only callback functions may be passed by FFI pointer"
+                );
 
             RoutineDetails* r = Ensure_Cell_Frame_Details(arg);
-            CFunction* cfunc = Routine_Cfunc(r);
+            CFunction* cfunc = Routine_C_Function(r);
             size_t sizeof_cfunc = sizeof(cfunc);  // avoid conditional const
             if (sizeof_cfunc != sizeof(intptr_t))  // not necessarily true
                 fail ("intptr_t size not equal to function pointer size");
@@ -621,6 +601,7 @@ static void Ffi_To_Cell(
         assert(not Field_Is_C_Array(top));  // !!! wasn't supported, should be?
 
         StructInstance* stu = Prep_Stub(STUB_MASK_STRUCT, Alloc_Stub());
+        Force_Erase_Cell(Stub_Cell(stu));
         LINK_STRUCT_SCHEMA(stu) = top;
         STRUCT_OFFSET(stu) = 0;
 
@@ -731,9 +712,9 @@ Bounce Routine_Dispatcher(Level* const L)
             return FAIL("Library closed in Routine_Dispatcher()");
     }
 
-    REBLEN num_fixed = Routine_Num_Fixed_Args(r);
-    REBLEN num_args = num_fixed;  // we'll add num_variable if variadic
-    REBLEN num_variable = 0;  // will count them if variadic
+    Count num_fixed = Routine_Num_Fixed_Args(r);
+    Count num_args = num_fixed;  // we'll add num_variable if variadic
+    Count num_variable = 0;  // will count them if variadic
 
     if (not Is_Routine_Variadic(r))
         goto make_backing_store;
@@ -808,17 +789,19 @@ Bounce Routine_Dispatcher(Level* const L)
 
     Binary* store = Make_Binary(1);
 
+    Option(Element*) ret_schema = Routine_Return_Schema_Unless_Void(r);
     void* ret_offset;
-    if (not Is_Blank(Routine_Return_Schema(r))) {
+    if (ret_schema) {
         Offset offset;
-        Option(const Key*) key = nullptr;  // return values, no name
+        const Symbol* ret_sym = CANON(RETURN);
+        const Key* key = &ret_sym;  // return values, no name
         const Param* param = nullptr;
         Option(Error*) e = Trap_Cell_To_Ffi(
             &offset,
             store,  // ffi-converted arg appended here
             nullptr,  // dest pointer must be nullptr if store is non-nullptr
             nullptr,  // arg: none (only making space--leave uninitialized)
-            Routine_Return_Schema(r),
+            unwrap ret_schema,
             Level_Label(L),
             key,
             param
@@ -833,8 +816,10 @@ Bounce Routine_Dispatcher(Level* const L)
     Flex* arg_offsets;
     if (num_args == 0)
         arg_offsets = nullptr;  // don't waste time with the alloc + free
-    else
-        arg_offsets = Make_Flex(num_args, Flex, FLAG_FLAVOR(POINTERS));
+    else {
+        arg_offsets = Make_Flex(FLAG_FLAVOR(POINTERS), Flex, num_args);
+        Set_Flex_Len(arg_offsets, num_args);
+    }
 
   gather_fixed_parameters: { /////////////////////////////////////////////////
 
@@ -871,9 +856,9 @@ Bounce Routine_Dispatcher(Level* const L)
     // These pointers need to be freed by HANDLE! cleanup.
     //
     // 1. If an FFI routine takes a fixed number of arguments, then its Call
-    //    InterFace (CIF) can be created just once.  This will be in the
-    //    Routine_Cif.  However a variadic routine requires a CIF that matches the
-    //    number and types of arguments for that specific call.
+    //    InterFace (CIF) can be created just once, and stored in the routine.
+    //    However a variadic routine requires a CIF that matches the number
+    //    and types of arguments for that specific call.
     //
     // 2. CIF creation requires a C array of argument descriptions that is
     //    contiguous across both the fixed and variadic parts.  Start by
@@ -887,7 +872,7 @@ Bounce Routine_Dispatcher(Level* const L)
     ffi_type **args_fftypes = nullptr;  // ffi_type*[] if num_variable > 0
 
     if (not Is_Routine_Variadic(r)) {  // fixed args, CIF created once [1]
-        cif = Routine_Cif(r);
+        cif = Routine_Call_Interface(r);
     }
     else {
         assert(Not_Cell_Readable(Routine_At(rin, IDX_ROUTINE_CIF)));
@@ -897,10 +882,13 @@ Bounce Routine_Dispatcher(Level* const L)
 
         REBLEN i;
         for (i = 0; i < num_fixed; ++i)
-            args_fftypes[i] = SCHEMA_FFTYPE(Routine_Arg_Schema(r, i));
+            args_fftypes[i] = Schema_Ffi_Type(Routine_Arg_Schema(r, i));
 
         DECLARE_ELEMENT (schema);
         DECLARE_ELEMENT (param);
+
+        const Symbol* varargs_symbol = EXT_CANON(VARARGS);
+        const Key* key = &varargs_symbol;
 
         StackIndex dsp;
         for (dsp = base + 1; i < num_args; dsp += 2, ++i) {
@@ -908,15 +896,14 @@ Bounce Routine_Dispatcher(Level* const L)
                 schema,
                 param, // sets type bits in param
                 Data_Stack_At(Element, dsp + 1), // errors if not a block
-                CANON(ELLIPSIS_1)  // symbol will appear in error reports
+                varargs_symbol  // symbol will appear in error reports
             );
             if (e1)
                 return FAIL(unwrap e1);
 
-            args_fftypes[i] = SCHEMA_FFTYPE(schema);
+            args_fftypes[i] = Schema_Ffi_Type(schema);
 
             Offset offset;
-            Option(const Key*) key = nullptr;
             const Param* param = nullptr;
             Option(Error*) e2 = Trap_Cell_To_Ffi(
                 &offset,
@@ -938,14 +925,15 @@ Bounce Routine_Dispatcher(Level* const L)
 
         cif = rebAlloc(ffi_cif);
 
+        Option(Element*) ret_schema = Routine_Return_Schema_Unless_Void(r);
         ffi_status status = ffi_prep_cif_var(  // _var-iadic prep_cif version
             cif,
             Routine_Abi(r),
             num_fixed,  // just fixed
             num_args,  // fixed plus variable
-            Is_Blank(Routine_Return_Schema(r))
-                ? &ffi_type_void
-                : SCHEMA_FFTYPE(Routine_Return_Schema(r)),  // return FFI type
+            ret_schema
+                ? Schema_Ffi_Type(unwrap ret_schema)
+                : &ffi_type_void,
             args_fftypes  // arguments FFI types
         );
 
@@ -962,10 +950,10 @@ Bounce Routine_Dispatcher(Level* const L)
     // the offsets of each FFI argument into actual pointers (since the
     // data won't be relocated)
 
-    if (Is_Blank(Routine_Return_Schema(r)))
-        ret_offset = nullptr;
-    else
+    if (Routine_Return_Schema_Unless_Void(r))
         ret_offset = Flex_Data(store) + i_cast(Offset, ret_offset);
+    else
+        ret_offset = nullptr;  // void return, no associated storage
 
     REBLEN i;
     for (i = 0; i < num_args; ++i) {
@@ -985,17 +973,18 @@ Bounce Routine_Dispatcher(Level* const L)
 
     ffi_call(
         cif,
-        Routine_Cfunc(r),
+        Routine_C_Function(r),
         ret_offset,  // actually a real pointer now (no longer an offset)
         (num_args == 0)
             ? nullptr
             : Flex_Head(void*, arg_offsets)  // also real pointers now
     );
 
-    if (Is_Blank(Routine_Return_Schema(r)))
-        Init_Nulled(OUT);
+    Option(Element*) ret_schema = Routine_Return_Schema_Unless_Void(r);
+    if (ret_schema)
+        Ffi_To_Cell(OUT, unwrap ret_schema, ret_offset);
     else
-        Ffi_To_Cell(OUT, Routine_Return_Schema(r), ret_offset);
+        Init_Nothing(OUT);  // ~ antiform is best return result for void
 
     if (num_args != 0)
         Free_Unmanaged_Flex(arg_offsets);
@@ -1037,7 +1026,7 @@ bool Routine_Details_Querier(
       case SYM_ADDRESS_OF:
         return Init_Integer(
             out,
-            i_cast(intptr_t, Routine_Cfunc(r))  // fabricated or wrapped [1]
+            i_cast(intptr_t, Routine_C_Function(r))  // fabricated/wrapped [1]
         );
 
       default:
@@ -1154,9 +1143,12 @@ void callback_dispatcher(  // client C code calls this, not the trampoline
 
 } finished_rebol_call: { /////////////////////////////////////////////////////
 
+    Option(Element*) ret_schema = Routine_Return_Schema_Unless_Void(r);
     if (cif->rtype->type == FFI_TYPE_VOID)
-        assert(Is_Blank(Routine_Return_Schema(r)));
+        assert(not ret_schema);
     else {
+        assert(ret_schema);
+
         const Symbol* spelling = CANON(RETURN);
         const Param* param = nullptr;
         Offset offset;
@@ -1165,7 +1157,7 @@ void callback_dispatcher(  // client C code calls this, not the trampoline
             nullptr,  // store must be null if dest is non-null,
             ret,  // destination pointer
             cast(Value*, result),
-            Routine_Return_Schema(r),
+            unwrap ret_schema,
             label,
             &spelling,  // parameter used for symbol in error only
             param
@@ -1209,11 +1201,13 @@ Option(Error*) Trap_Alloc_Ffi_Action_For_Spec(
 ){
     assert(Is_Block(ffi_spec));
 
-    // Build the paramlist on the data stack.  First slot is reserved for the
-    // ACT_ARCHETYPE (see comments on `struct Reb_Action`)
-    //
     StackIndex base = TOP_INDEX;
-    Init_Unreadable(PUSH());  // GC-safe form of "trash"
+
+    RoutineDetails* r;
+    Count num_fixed = 0;  // number of fixed (non-variadic) arguments
+    bool is_variadic = false;  // default to not being variadic
+
+  build_paramlist_on_data_stack: { ///////////////////////////////////////////
 
     // arguments can be complex, defined as structures.  A "schema" is a
     // REBVAL that holds either an INTEGER! for simple types, or a HANDLE!
@@ -1226,17 +1220,14 @@ Option(Error*) Trap_Alloc_Ffi_Action_For_Spec(
     // ready for GC visibility.
     //
     // !!! Should the spec analysis be allowed to do evaluation? (it does)
-    //
+
     const REBLEN capacity_guess = 8;  // !!! Magic number...why 8? (can grow)
     Source* args_schemas = Make_Source_Managed(capacity_guess);
     Push_Lifeguard(args_schemas);
 
-    DECLARE_ELEMENT (ret_schema);
-    Init_Blank(ret_schema);  // ret_schema defaults blank (e.g. void C func)
-    Push_Lifeguard(ret_schema);
-
-    REBLEN num_fixed = 0;  // number of fixed (non-variadic) arguments
-    bool is_variadic = false;  // default to not being variadic
+    DECLARE_ELEMENT (ret_schema_or_blank);
+    Init_Blank(ret_schema_or_blank);  // defaults blank (e.g. void C func)
+    Push_Lifeguard(ret_schema_or_blank);
 
     const Element* tail;
     const Element* item = Cell_List_At(&tail, ffi_spec);
@@ -1248,7 +1239,7 @@ Option(Error*) Trap_Alloc_Ffi_Action_For_Spec(
             if (Cell_Word_Id(item) != SYM_RETURN)
                 return Error_Bad_Value(item);
 
-            if (not Is_Blank(ret_schema))
+            if (not Is_Blank(ret_schema_or_blank))
                 return Error_User("FFI: Return already specified");
 
             ++item;
@@ -1257,10 +1248,10 @@ Option(Error*) Trap_Alloc_Ffi_Action_For_Spec(
             Derelativize(block, item, Cell_List_Binding(ffi_spec));
 
             Option(Error*) e = Trap_Make_Schema_From_Block(
-                ret_schema,
+                ret_schema_or_blank,
                 nullptr,  // dummy (return/output has no arg to typecheck)
                 block,
-                nullptr  // no symbol name
+                CANON(RETURN)
             );
             if (e)
                 return e;
@@ -1315,6 +1306,7 @@ Option(Error*) Trap_Alloc_Ffi_Action_For_Spec(
             return Error_Bad_Value(item);
     }
 
+  pop_paramlist_and_create_routine: { ////////////////////////////////////////
 
     Option(Phase*) prior = nullptr;
     Option(VarList*) prior_coupling = nullptr;
@@ -1326,22 +1318,11 @@ Option(Error*) Trap_Alloc_Ffi_Action_For_Spec(
     if (e)
         return e;
 
-    // Initializing the array head to a void signals the Make_Action() that
-    // it is supposed to touch up the paramlist to point to the action.
-    //
-    // !!! FFI needs update to the new keylist conventions, with a REBSER*
-    // of symbols, instead of having the symbols in the key.   Much of this
-    // frame building is likely better expressed as user code that then
-    // passes the constructed FRAME! in to be coupled with the routine
-    // dispatcher.
-    //
-    Init_Unreadable(Array_Head(paramlist));  // must touch up later
-
-    RoutineDetails* r = Make_Dispatch_Details(
+    r = Make_Dispatch_Details(
         DETAILS_MASK_NONE,
         Phase_Archetype(paramlist),
         &Routine_Dispatcher,
-        IDX_ROUTINE_MAX  // details array len
+        MAX_IDX_ROUTINE  // details array len
     );
 
     Init_Integer(Routine_At(r, IDX_ROUTINE_ABI), abi);
@@ -1350,8 +1331,8 @@ Option(Error*) Trap_Alloc_Ffi_Action_For_Spec(
     Init_Unreadable(Routine_At(r, IDX_ROUTINE_CLOSURE));  // "
     Init_Unreadable(Routine_At(r, IDX_ROUTINE_ORIGIN));  // " LIBRARY!/ACTION!
 
-    Copy_Cell(Routine_At(r, IDX_ROUTINE_RET_SCHEMA), ret_schema);
-    Drop_Lifeguard(ret_schema);
+    Copy_Cell(Routine_At(r, IDX_ROUTINE_RET_SCHEMA), ret_schema_or_blank);
+    Drop_Lifeguard(ret_schema_or_blank);
 
     Init_Logic(Routine_At(r, IDX_ROUTINE_IS_VARIADIC), is_variadic);
 
@@ -1359,7 +1340,7 @@ Option(Error*) Trap_Alloc_Ffi_Action_For_Spec(
     Init_Block(Routine_At(r, IDX_ROUTINE_ARG_SCHEMAS), args_schemas);
     Drop_Lifeguard(args_schemas);
 
-  //=//// BUILD CIF (IF NOT VARIADIC) ////////////////////////////////////=//
+}} build_cif_call_interface_if_not_variadic: { ///////////////////////////////
 
     // If a routine is variadic, then each individual invocation needs to use
     // `ffi_prep_cif_var` to make the proper variadic CIF for that call.
@@ -1384,16 +1365,17 @@ Option(Error*) Trap_Alloc_Ffi_Action_For_Spec(
 
     REBLEN i;
     for (i = 0; i < num_fixed; ++i)
-        args_fftypes[i] = SCHEMA_FFTYPE(Routine_Arg_Schema(r, i));
+        args_fftypes[i] = Schema_Ffi_Type(Routine_Arg_Schema(r, i));
 
+    Option(Element*) ret_schema = Routine_Return_Schema_Unless_Void(r);
     if (
         FFI_OK != ffi_prep_cif(
             cif,
             abi,
             num_fixed,
-            Is_Blank(Routine_Return_Schema(r))
-                ? &ffi_type_void
-                : SCHEMA_FFTYPE(Routine_Return_Schema(r)),
+            ret_schema
+                ? Schema_Ffi_Type(unwrap ret_schema)
+                : &ffi_type_void,
             args_fftypes  // nullptr if 0 fixed args
         )
     ){
@@ -1419,7 +1401,7 @@ Option(Error*) Trap_Alloc_Ffi_Action_For_Spec(
 
     *out = r;
     return nullptr;  // no error
-}
+}}
 
 
 //
@@ -1459,6 +1441,8 @@ DECLARE_NATIVE(MAKE_ROUTINE)
         return FAIL(unwrap e);
 
     Copy_Cell(Routine_At(r, IDX_ROUTINE_CFUNC), handle);
+    rebRelease(handle);
+
     Init_Blank(Routine_At(r, IDX_ROUTINE_CLOSURE));
     Copy_Cell(Routine_At(r, IDX_ROUTINE_ORIGIN), ARG(LIB));
 
@@ -1551,7 +1535,7 @@ DECLARE_NATIVE(WRAP_CALLBACK)
 
     ffi_status status = ffi_prep_closure_loc(
         closure,
-        Routine_Cif(r),
+        Routine_Call_Interface(r),
         callback_dispatcher,  // when thunk is called, calls this function...
         r,  // ...and this piece of data is passed to callback_dispatcher
         thunk

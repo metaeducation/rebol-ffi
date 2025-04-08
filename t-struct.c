@@ -1008,7 +1008,8 @@ Option(Error*) Trap_Make_Struct(Sink(Element) out, const Element* arg)
     Level* L = Make_Level_At(&Stepper_Executor, arg, LEVEL_MASK_NONE);
     const Element* at = At_Level(L);
 
-    Push_Level_Erase_Out_If_State_0(nullptr, L);
+    DECLARE_ATOM (eval);
+    Push_Level_Erase_Out_If_State_0(eval, L);
 
     REBINT max_fields = 16;
 
@@ -1292,6 +1293,7 @@ Option(Error*) Trap_Make_Struct(Sink(Element) out, const Element* arg)
 } finalize_struct: { /////////////////////////////////////////////////////////
 
     StructInstance* stu = Prep_Stub(STUB_MASK_STRUCT, Alloc_Stub());
+    Force_Erase_Cell(Stub_Cell(stu));
     Manage_Flex(schema);
     LINK_STRUCT_SCHEMA(stu) = schema;
 
@@ -1370,7 +1372,7 @@ IMPLEMENT_GENERIC(PICK, Is_Struct)
 
         if (not Field_Is_C_Array(field)) {
             Get_Scalar_In_Struct(OUT, stu, field, 0);  // index 0
-            continue;
+            return OUT;
         }
 
         REBLEN dimension = Field_Dimension(field);
@@ -1474,6 +1476,7 @@ IMPLEMENT_GENERIC(EQUAL_Q, Is_Struct)
 StructInstance* Copy_Struct_Managed(StructInstance* src)
 {
     StructInstance* copy = Prep_Stub(STUB_MASK_STRUCT, Alloc_Stub());
+    Force_Erase_Cell(Stub_Cell(copy));
 
     LINK_STRUCT_SCHEMA(copy) = LINK_STRUCT_SCHEMA(src);  // share the schema
     MISC_STRUCT_OFFSET(copy) = MISC_STRUCT_OFFSET(src);  // copies offset

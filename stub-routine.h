@@ -94,7 +94,7 @@ enum {
 
 #define Routine_At(a,n)  Details_At((r), (n))
 
-INLINE CFunction* Routine_Cfunc(RoutineDetails* r)
+INLINE CFunction* Routine_C_Function(RoutineDetails* r)
   { return Cell_Handle_Cfunc(Routine_At(r, IDX_ROUTINE_CFUNC)); }
 
 INLINE ffi_abi Routine_Abi(RoutineDetails* r)
@@ -104,7 +104,7 @@ INLINE bool Is_Routine_Callback(RoutineDetails* r) {
     if (Is_Action(Routine_At(r, IDX_ROUTINE_ORIGIN)))
         return true;
     assert(
-        rebDid("library?", Routine_At(r, IDX_ROUTINE_ORIGIN))
+        rebDid("library! = type of", Routine_At(r, IDX_ROUTINE_ORIGIN))
         or Is_Blank(Routine_At(r, IDX_ROUTINE_ORIGIN))
     );
     return false;
@@ -127,10 +127,13 @@ INLINE Value* Routine_Callback_Action(RoutineDetails* r) {
     return Routine_At(r, IDX_ROUTINE_ORIGIN);
 }
 
-INLINE Element* Routine_Return_Schema(RoutineDetails* r)
-  { return Known_Element(Routine_At(r, IDX_ROUTINE_RET_SCHEMA)); }
+INLINE Option(Element*) Routine_Return_Schema_Unless_Void(RoutineDetails* r) {
+    if (Is_Blank(Routine_At(r, IDX_ROUTINE_RET_SCHEMA)))
+        return nullptr;
+    return Known_Element(Routine_At(r, IDX_ROUTINE_RET_SCHEMA));
+}
 
-INLINE REBLEN Routine_Num_Fixed_Args(RoutineDetails* r)
+INLINE Count Routine_Num_Fixed_Args(RoutineDetails* r)
   { return Cell_Series_Len_Head(Routine_At(r, IDX_ROUTINE_ARG_SCHEMAS)); }
 
 INLINE Element* Routine_Arg_Schema(
@@ -141,17 +144,19 @@ INLINE Element* Routine_Arg_Schema(
     return Array_At(Cell_Array_Known_Mutable(arg_schemas), offset);
 }
 
-INLINE ffi_cif* Routine_Cif(RoutineDetails* r)
-  { return Cell_Handle_Pointer(ffi_cif, Routine_At(r, IDX_ROUTINE_CIF)); }
+INLINE bool Is_Routine_Variadic(RoutineDetails* r)
+    { return Cell_Logic(Routine_At(r, IDX_ROUTINE_IS_VARIADIC)); }
+
+INLINE ffi_cif* Routine_Call_Interface(RoutineDetails* r) {
+    assert(not Is_Routine_Variadic(r));  // needs per-invocation CIF
+    return Cell_Handle_Pointer(ffi_cif, Routine_At(r, IDX_ROUTINE_CIF));
+}
 
 INLINE ffi_type** RIN_ARG_FFTYPES(RoutineDetails* r) {  // !!! unused?
     return Cell_Handle_Pointer(ffi_type*,
         Routine_At(r, IDX_ROUTINE_ARG_FFTYPES)
     );
 }
-
-INLINE bool Is_Routine_Variadic(RoutineDetails* r)
-    { return Cell_Logic(Routine_At(r, IDX_ROUTINE_IS_VARIADIC)); }
 
 
 //=//// TEST IF ACTION IS A ROUTINE ///////////////////////////////////////=//
@@ -171,6 +176,12 @@ INLINE bool Is_Routine_Variadic(RoutineDetails* r)
 //
 
 extern Bounce Routine_Dispatcher(Level *L);
+
+extern bool Routine_Details_Querier(
+    Sink(Value) out,
+    Details* details,
+    SymId property
+);
 
 INLINE bool Is_Action_Routine(const Value* v) {
     Phase* phase = Cell_Frame_Phase(v);
