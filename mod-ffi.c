@@ -30,56 +30,6 @@
 #include "stub-routine.h"
 
 
-
-//
-//  export addr-of: native [
-//
-//  "Get the memory address of an FFI STRUCT! or routine/callback"
-//
-//      return: "Memory address expressed as an up-to-64-bit integer"
-//          [integer!]
-//      value "Fixed address structure or routine to get the address of"
-//          [action! struct!]
-//  ]
-//
-DECLARE_NATIVE(ADDR_OF)
-//
-// 1. The CFunction is fabricated by the FFI if it's a callback, or just the
-//    wrapped DLL function if it's an ordinary routine
-//
-// 2. !!! If a structure wasn't mapped onto "raw-memory" from the C,
-//    then currently the data for that struct is a BINARY!, not a handle to
-//    something which was malloc'd.  Much of the system is designed to be
-//    able to handle memory relocations of a series data, but if a pointer is
-//    given to code it may expect that address to be permanent.  Data
-//    pointers currently do not move (e.g. no GC compaction) unless there is
-//    a modification to the series, but this may change...in which case a
-//    "do not move in memory" bit would be needed for the BINARY! or a
-//    HANDLE! to a non-moving malloc would need to be used instead.
-{
-    INCLUDE_PARAMS_OF_ADDR_OF;
-
-    Value* v = ARG(VALUE);
-
-    if (Is_Action(v)) {
-        if (not Is_Action_Routine(v))
-            return FAIL(
-                "Can only take address of ACTION!s created though FFI"
-            );
-
-        RoutineDetails* r = Ensure_Cell_Frame_Details(v);
-        return Init_Integer(
-            OUT,
-            i_cast(intptr_t, Routine_Cfunc(r))  // fabricated or wrapped [1]
-        );
-    }
-
-    assert(Is_Struct(v));
-
-    return Init_Integer(OUT, i_cast(intptr_t, Cell_Struct_Data_At(v)));  // [2]
-}
-
-
 //
 //  export alloc-value-pointer: native [
 //
@@ -208,6 +158,8 @@ DECLARE_NATIVE(SET_AT_POINTER)
 DECLARE_NATIVE(STARTUP_P)
 {
     INCLUDE_PARAMS_OF_STARTUP_P;
+
+    Register_Dispatcher(&Routine_Dispatcher, &Routine_Details_Querier);
 
     return NOTHING;
 }

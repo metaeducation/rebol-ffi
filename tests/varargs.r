@@ -57,7 +57,7 @@ h: make struct! [
     a [uint8 [128]]
 ]
 len: (sprintf
-    addr-of h
+    address of h
     join "hello %s" newline
     "world" [pointer]
 )

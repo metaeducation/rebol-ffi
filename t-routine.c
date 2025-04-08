@@ -490,12 +490,13 @@ static Option(Error*) Trap_Cell_To_Ffi(
         if (not arg) {
             buffer.ipt = 0xDECAFBAD;  // return value, make space (but init)
         }
-        else if (Heart_Of_Is_0(arg)) {  // extended type
-            rebElide("assert [vector? @", arg, "]");  // just VECTOR! for now
-            buffer.ipt = cast(intptr_t,
-                rebUnboxInteger("pointer of", rebQ(arg))
-            );
-            break;
+        else if (Heart_Of_Is_0(arg)) {
+            if (rebNot("vector! = type of @", arg))
+                return Error_User(
+                    "VECTOR! is only extension type FFI accepts by pointer"
+                );
+            buffer.ipt = cast(intptr_t, rebUnboxInteger("address-of", arg));
+            size = sizeof(buffer.ipt);
         }
         else if (Is_Nulled(arg)) {
             buffer.ipt = 0;
@@ -1008,6 +1009,43 @@ Bounce Routine_Dispatcher(Level* const L)
 
     return OUT;  // Note: cannot "throw" a Rebol value across an FFI boundary.
 }}
+
+
+//
+//  Routine_Details_Querier: C
+//
+bool Routine_Details_Querier(
+    Sink(Value) out,
+    Details* details,
+    SymId property
+){
+    RoutineDetails* r = details;
+
+    switch (property) {
+      case SYM_RETURN_OF: {
+        Extract_Paramlist_Returner(out, Phase_Paramlist(details), SYM_RETURN);
+        return true; }
+
+      case SYM_BODY_OF: {
+        assert(!"Body of not supported by Routine yet");
+        Init_Blank(out);
+        return true; }
+
+    // 1. The CFunction is fabricated by the FFI if it's a callback, or just
+    //    the wrapped DLL function if it's an ordinary routine
+
+      case SYM_ADDRESS_OF:
+        return Init_Integer(
+            out,
+            i_cast(intptr_t, Routine_Cfunc(r))  // fabricated or wrapped [1]
+        );
+
+      default:
+        break;
+    }
+
+    return false;
+}
 
 
 //

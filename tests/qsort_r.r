@@ -71,7 +71,7 @@ qsort_r: make-routine libc "qsort_r" compose:deep [
 
 array: make vector! [integer! 32 5 [10 8 2 9 5]]
 print ["before:" mold array]
-probe (addr-of cb/)
+probe (address of cb/)
 qsort_r array 5 4 cb/ <A Tunneled Tag>
 print ["after:" mold array]
 

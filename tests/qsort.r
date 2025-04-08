@@ -95,10 +95,13 @@ qsort: make-routine libc "qsort" compose:deep [
 ]
 
 array: make vector! [integer! 32 5 [10 8 2 9 5]]
-print ["before:" mold array]
-probe (addr-of :cb)
-qsort array 5 4 (addr-of :cb)
-print ["after:" mold array]
+
+print ["callback address:" mold address of cb/]
+print ["array address:" mold address of array]
+
+print ["array before:" mold array]
+qsort array 5 4 (address of cb/)
+print ["array after:" mold array]
 
 assert [array = make vector! [integer! 32 5 [2 5 8 9 10]]]
 

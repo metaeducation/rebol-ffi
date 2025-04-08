@@ -1547,6 +1547,27 @@ IMPLEMENT_GENERIC(VALUES_OF, Is_Struct)
     return Init_Blob(OUT, bin);
 }
 
+
+// !!! If a structure wasn't mapped onto "raw-memory" from the C, then
+// currently the data for that struct is a BLOB!, not a handle to something
+// which was malloc'd.  Much of the system is designed to be able to handle
+// memory relocations of a series data, but if a pointer is given to code it
+// may expect that address to be permanent.  Data pointers currently do not
+// move (e.g. no GC compaction) unless there is a modification to the series,
+// but this may change...in which case a "do not move in memory" bit would be
+// needed for the BLOB! or a HANDLE! to a non-moving malloc would need to be
+// used instead.
+//
+IMPLEMENT_GENERIC(ADDRESS_OF, Is_Struct)
+{
+    INCLUDE_PARAMS_OF_ADDRESS_OF;
+
+    Value* v = ARG(ELEMENT);
+
+    return Init_Integer(OUT, i_cast(intptr_t, Cell_Struct_Data_At(v)));
+}
+
+
 /*
     IMPLEMENT_GENERIC(SPEC_OF, Is_Struct)
     {

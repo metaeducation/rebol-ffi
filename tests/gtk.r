@@ -181,7 +181,7 @@ init-gtk: function [app] [
     ]
 
     print ["assign pointer"]
-    argv.args.1: addr-of arg0
+    argv.args.1: address of arg0
 
     print ["argv:" argv]
     argc: make struct! [
@@ -189,13 +189,13 @@ init-gtk: function [app] [
     ]
 
     addr-argv: make struct! [
-        addr: [pointer] (addr-of argv)
+        addr: [pointer] (address of argv)
     ]
 
     print ["addr-argv:" addr-argv]
-    print ["addr of addr-argv:" addr-of addr-argv]
+    print ["addr of addr-argv:" address of addr-argv]
 
-    gtk-init (addr-of argc) (addr-of addr-argv)
+    gtk-init (address of argc) (address of addr-argv)
     print ["argc:" argc "argv:" argv]
 ]
 
@@ -245,7 +245,7 @@ but1: gtk-button-new-with-label "button 1"
 gtk-box-pack-start hbox but1 1 1 0
 
 n-clicked: make struct! [i: [int32] 0]
-g-signal-connect but1 "clicked" on-click-callback/ (addr-of n-clicked)
+g-signal-connect but1 "clicked" on-click-callback/ (address of n-clicked)
 
 but2: gtk-button-new-with-label "button 2"
 gtk-box-pack-start hbox but2 1 1 0
