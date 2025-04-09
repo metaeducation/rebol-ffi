@@ -607,9 +607,10 @@ static void Ffi_To_Cell(
 
         Binary* data = Make_Binary_Core(
             NODE_FLAG_MANAGED,
-            Field_Width(top)  // !!! what about Field_Total_Size ?
+            Field_Width(top)  // not Field_Is_C_Array, so no Field_Total_Size ?
         );
         memcpy(Binary_Head(data), ffi_rvalue, Field_Width(top));
+        Term_Binary_Len(data, Field_Width(top));
 
         Reset_Extended_Cell_Header_Noquote(
             out,
