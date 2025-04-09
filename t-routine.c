@@ -832,18 +832,24 @@ Bounce Routine_Dispatcher(Level* const L)
     //
     // 1. We will convert this offset to a pointer later.
 
+    Option(const Symbol*) label = Level_Label(L);
+
     REBLEN i = 0;
     for (; i < num_fixed; ++i) {
+        const Param* param = Phase_Param(Level_Phase(L), i + 1);  // 1-based
+        const Key* key = Varlist_Key(Level_Varlist(L), i + 1);  // 1-based
+        const Value* arg = Level_Arg(L, i + 1);  // 1-based
+        const Element* schema = Routine_Arg_Schema(r, i);  // 0-based
+
         Offset offset;
-        const Param* param = nullptr;
         Option(Error*) e = Trap_Cell_To_Ffi(
             &offset,
             store,  // ffi-converted arg appended here
             nullptr,  // dest pointer must be nullptr if store is non-null
-            Level_Arg(L, i + 1),  // 1-based
-            Routine_Arg_Schema(r, i),  // 0-based
-            Level_Label(L),
-            Varlist_Key(Level_Varlist(L), i + 1),  // 1-based
+            arg,
+            schema,
+            label,
+            key,
             param
         );
         if (e)
