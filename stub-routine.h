@@ -152,7 +152,14 @@ INLINE ffi_cif* Routine_Call_Interface(RoutineDetails* r) {
     return Cell_Handle_Pointer(ffi_cif, Routine_At(r, IDX_ROUTINE_CIF));
 }
 
-INLINE ffi_type** RIN_ARG_FFTYPES(RoutineDetails* r) {  // !!! unused?
+// This is not used at present, because once the IDX_ARG_FFTYPES are assigned
+// then that's all they do--hold on to the lifetime of the data pointed to
+// by the IDX_ROUTINE_CIF.  The garbage collection of the handle happens
+// when the routine goes away, so there's no need to extract the handle from
+// the routine because the HANDLE! knows how to free itself.
+//
+INLINE ffi_type** Routine_Arg_Ffi_Types(RoutineDetails* r) {
+    assert(!"No believed usages of this at time of writing");
     return Cell_Handle_Pointer(ffi_type*,
         Routine_At(r, IDX_ROUTINE_ARG_FFTYPES)
     );
