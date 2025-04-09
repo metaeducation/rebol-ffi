@@ -1555,11 +1555,11 @@ IMPLEMENT_GENERIC(LENGTH_OF, Is_Struct)
 }
 
 
-IMPLEMENT_GENERIC(VALUES_OF, Is_Struct)
+IMPLEMENT_GENERIC(BYTES_OF, Is_Struct)
 {
-    INCLUDE_PARAMS_OF_VALUES_OF;
+    INCLUDE_PARAMS_OF_BYTES_OF;
 
-    Element* val = Element_ARG(ELEMENT);
+    Element* val = Element_ARG(VALUE);
 
     Binary* bin = Make_Binary(Cell_Struct_Total_Size(val));
     memcpy(
