@@ -77,9 +77,9 @@ DECLARE_NATIVE(FREE_VALUE_POINTER)
 
     Value* cell = p_cast(Value*, cast(intptr_t, VAL_INT64(ARG(POINTER))));
 
-    rebFree(cell);  // unmanaged [1]
+    rebRelease(cell);  // unmanaged [1]
 
-    return nullptr;
+    return NOTHING;
 }
 
 
