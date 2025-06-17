@@ -1452,7 +1452,8 @@ DECLARE_NATIVE(MAKE_ROUTINE)
     Init_Space(Routine_At(r, IDX_ROUTINE_CLOSURE));
     Copy_Cell(Routine_At(r, IDX_ROUTINE_ORIGIN), ARG(LIB));
 
-    return Init_Action(OUT, r, ANONYMOUS, UNBOUND);
+    Init_Action(OUT, r, ANONYMOUS, NONMETHOD);
+    return UNSURPRISING(OUT);
 }
 
 
@@ -1496,7 +1497,8 @@ DECLARE_NATIVE(MAKE_ROUTINE_RAW)
     Init_Space(Routine_At(r, IDX_ROUTINE_CLOSURE));
     Init_Space(Routine_At(r, IDX_ROUTINE_ORIGIN)); // no LIBRARY! in this case.
 
-    return Init_Action(OUT, r, ANONYMOUS, UNBOUND);
+    Init_Action(OUT, r, ANONYMOUS, NONMETHOD);
+    return UNSURPRISING(OUT);
 }
 
 
@@ -1566,5 +1568,6 @@ DECLARE_NATIVE(WRAP_CALLBACK)
     );
     Copy_Cell(Routine_At(r, IDX_ROUTINE_ORIGIN), ARG(ACTION));
 
-    return Init_Action(OUT, r, ANONYMOUS, UNBOUND);
+    Init_Action(OUT, r, ANONYMOUS, NONMETHOD);
+    return UNSURPRISING(OUT);
 }
