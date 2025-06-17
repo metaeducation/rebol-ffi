@@ -221,7 +221,7 @@ static Option(Error*) Trap_Make_Schema_From_Block(
 
     Option(SymId) id = Cell_Word_Id(item);
     if (id == SYM_VOID) {
-        Init_Blank(schema_out);
+        Init_Space(schema_out);
     }
     else
         Init_Word(schema_out, Cell_Word_Symbol(item));
@@ -1024,7 +1024,7 @@ bool Routine_Details_Querier(
 
       case SYM_BODY_OF: {
         assert(!"Body of not supported by Routine yet");
-        Init_Blank(out);
+        Init_Space(out);
         return true; }
 
     // 1. The CFunction is fabricated by the FFI if it's a callback, or just
@@ -1232,9 +1232,9 @@ Option(Error*) Trap_Alloc_Ffi_Action_For_Spec(
     Source* args_schemas = Make_Source_Managed(capacity_guess);
     Push_Lifeguard(args_schemas);
 
-    DECLARE_ELEMENT (ret_schema_or_blank);
-    Init_Blank(ret_schema_or_blank);  // defaults blank (e.g. void C func)
-    Push_Lifeguard(ret_schema_or_blank);
+    DECLARE_ELEMENT (ret_schema_or_space);
+    Init_Space(ret_schema_or_space);  // defaults SPACE (e.g. void C func)
+    Push_Lifeguard(ret_schema_or_space);
 
     const Element* tail;
     const Element* item = Cell_List_At(&tail, ffi_spec);
@@ -1246,7 +1246,7 @@ Option(Error*) Trap_Alloc_Ffi_Action_For_Spec(
             if (Cell_Word_Id(item) != SYM_RETURN)
                 return Error_Bad_Value(item);
 
-            if (not Is_Blank(ret_schema_or_blank))
+            if (not Is_Space(ret_schema_or_space))
                 return Error_User("FFI: Return already specified");
 
             ++item;
@@ -1255,7 +1255,7 @@ Option(Error*) Trap_Alloc_Ffi_Action_For_Spec(
             Derelativize(block, item, Cell_List_Binding(ffi_spec));
 
             Option(Error*) e = Trap_Make_Schema_From_Block(
-                ret_schema_or_blank,
+                ret_schema_or_space,
                 nullptr,  // dummy (return/output has no arg to typecheck)
                 block,
                 CANON(RETURN)
@@ -1338,8 +1338,8 @@ Option(Error*) Trap_Alloc_Ffi_Action_For_Spec(
     Init_Unreadable(Routine_At(r, IDX_ROUTINE_CLOSURE));  // "
     Init_Unreadable(Routine_At(r, IDX_ROUTINE_ORIGIN));  // " LIBRARY!/ACTION!
 
-    Copy_Cell(Routine_At(r, IDX_ROUTINE_RET_SCHEMA), ret_schema_or_blank);
-    Drop_Lifeguard(ret_schema_or_blank);
+    Copy_Cell(Routine_At(r, IDX_ROUTINE_RET_SCHEMA), ret_schema_or_space);
+    Drop_Lifeguard(ret_schema_or_space);
 
     Init_Logic(Routine_At(r, IDX_ROUTINE_IS_VARIADIC), is_variadic);
 
@@ -1397,7 +1397,7 @@ Option(Error*) Trap_Alloc_Ffi_Action_For_Spec(
     );
 
     if (args_fftypes == nullptr)
-        Init_Blank(Routine_At(r, IDX_ROUTINE_ARG_FFTYPES));
+        Init_Space(Routine_At(r, IDX_ROUTINE_ARG_FFTYPES));
     else
         Init_Handle_Cdata_Managed(
             Routine_At(r, IDX_ROUTINE_ARG_FFTYPES),
@@ -1450,7 +1450,7 @@ DECLARE_NATIVE(MAKE_ROUTINE)
     Copy_Cell(Routine_At(r, IDX_ROUTINE_CFUNC), handle);
     rebRelease(handle);
 
-    Init_Blank(Routine_At(r, IDX_ROUTINE_CLOSURE));
+    Init_Space(Routine_At(r, IDX_ROUTINE_CLOSURE));
     Copy_Cell(Routine_At(r, IDX_ROUTINE_ORIGIN), ARG(LIB));
 
     return Init_Action(OUT, r, ANONYMOUS, UNBOUND);
@@ -1494,8 +1494,8 @@ DECLARE_NATIVE(MAKE_ROUTINE_RAW)
         return FAIL(unwrap e);
 
     Init_Handle_Cfunc(Routine_At(r, IDX_ROUTINE_CFUNC), cfunc);
-    Init_Blank(Routine_At(r, IDX_ROUTINE_CLOSURE));
-    Init_Blank(Routine_At(r, IDX_ROUTINE_ORIGIN)); // no LIBRARY! in this case.
+    Init_Space(Routine_At(r, IDX_ROUTINE_CLOSURE));
+    Init_Space(Routine_At(r, IDX_ROUTINE_ORIGIN)); // no LIBRARY! in this case.
 
     return Init_Action(OUT, r, ANONYMOUS, UNBOUND);
 }

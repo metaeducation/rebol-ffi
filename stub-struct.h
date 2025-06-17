@@ -127,7 +127,7 @@ INLINE Option(ffi_type*) Get_Ffi_Type_For_Symbol(SymId id) {
 typedef Source StructField;  // alias to help find usages
 
 enum {
-    // A WORD! name for the field (or BLANK! if anonymous)
+    // A WORD! name for the field (or SPACE if anonymous)
     //
     // https://gcc.gnu.org/onlinedocs/gcc-4.7.2/gcc/Unnamed-Fields.html
     //
@@ -139,7 +139,7 @@ enum {
     //
     IDX_FIELD_TYPE,
 
-    // An INTEGER! of the array dimensionality, or BLANK! if not an array.
+    // An INTEGER! of the array dimensionality, or SPACE if not an array.
     //
     IDX_FIELD_DIMENSION,
 
@@ -151,7 +151,7 @@ enum {
     IDX_FIELD_FFTYPE,
 
     // An INTEGER! of the offset this field is relative to the beginning
-    // of its entire containing structure.  Will be BLANK! if the structure
+    // of its entire containing structure.  Will be SPACE if the structure
     // is actually the root structure itself.
     //
     // !!! Comment said "size is limited by struct->offset, so only 16-bit"?
@@ -169,7 +169,7 @@ enum {
     Flex_At(Value, (a), (n))  // locate index access
 
 INLINE Option(const Symbol*) Field_Name(StructField* f) {
-    if (Is_Blank(Field_Detail(f, IDX_FIELD_NAME)))
+    if (Is_Space(Field_Detail(f, IDX_FIELD_NAME)))
         return nullptr;
     return Cell_Word_Symbol(Field_Detail(f, IDX_FIELD_NAME));
 }
@@ -200,7 +200,7 @@ INLINE Source* Field_Subfields_Array(StructField* f) {
 }
 
 INLINE bool Field_Is_C_Array(StructField* f) {
-    if (Is_Blank(Field_Detail(f, IDX_FIELD_DIMENSION)))
+    if (Is_Space(Field_Detail(f, IDX_FIELD_DIMENSION)))
         return false;
     assert(Is_Integer(Field_Detail(f, IDX_FIELD_DIMENSION)));
     return true;

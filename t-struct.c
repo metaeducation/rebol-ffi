@@ -847,7 +847,7 @@ static Option(Error*) Trap_Parse_Field_Type_May_Fail(
     // Find out the array dimension (if there is one)
     //
     if (val == tail) {
-        Init_Blank(Field_Detail(field, IDX_FIELD_DIMENSION)); // scalar
+        Init_Space(Field_Detail(field, IDX_FIELD_DIMENSION)); // scalar
     }
     else if (Is_Block(val)) {
         //
@@ -1035,10 +1035,10 @@ Option(Error*) Trap_Make_Struct(Sink(Element) out, const Element* arg)
     StructField* schema = Make_Source(MAX_IDX_FIELD + 1);
     Set_Flex_Len(schema, MAX_IDX_FIELD + 1);
     Init_Unreadable(Field_Detail(schema, IDX_FIELD_TYPE));  // will fill in
-    Init_Blank(Field_Detail(schema, IDX_FIELD_DIMENSION));  // not used [1]
+    Init_Space(Field_Detail(schema, IDX_FIELD_DIMENSION));  // not used [1]
     Init_Unreadable(Field_Detail(schema, IDX_FIELD_FFTYPE));  // will fill in
-    Init_Blank(Field_Detail(schema, IDX_FIELD_NAME));  // no symbol for structs
-    Init_Blank(Field_Detail(schema, IDX_FIELD_OFFSET));  // not used [2]
+    Init_Space(Field_Detail(schema, IDX_FIELD_NAME));  // no symbol for structs
+    Init_Space(Field_Detail(schema, IDX_FIELD_OFFSET));  // not used [2]
     Init_Unreadable(Field_Detail(schema, IDX_FIELD_WIDE));  // will fill in
 
   process_fields: ////////////////////////////////////////////////////////////
@@ -1611,7 +1611,7 @@ IMPLEMENT_GENERIC(ADDRESS_OF, Is_Struct)
 //      spec "Struct with interface to copy"
 //          [struct!]
 //      body "keys and values defining instance contents (bindings modified)"
-//          [block! any-context? blank!]
+//          [block!]
 //  ]
 //
 DECLARE_NATIVE(MAKE_SIMILAR_STRUCT)

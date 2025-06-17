@@ -54,17 +54,17 @@ enum {
     // The "schema" of the return type.  This is either a WORD! (which
     // is a symbol corresponding to the FFI_TYPE constant of the return) or
     // a BLOCK! representing a field (this REBFLD will hopefully become
-    // OBJECT! at some point).  If it is BLANK! then there is no return type.
+    // OBJECT! at some point).  If it's SPACE then there is no return type.
     //
     IDX_ROUTINE_RET_SCHEMA,
 
     // An ARRAY! of the argument schemas; each also WORD! or ARRAY!, following
-    // the same pattern as the return value...but not allowed to be blank
+    // the same pattern as the return value...but not allowed to be SPACE
     // (no such thing as a void argument)
     //
     IDX_ROUTINE_ARG_SCHEMAS,
 
-    // A HANDLE! containing one ffi_cif*, or BLANK! if variadic.  The Call
+    // A HANDLE! containing one ffi_cif*, or SPACE if variadic.  The Call
     // InterFace (CIF) for a C function with fixed arguments can be created
     // once and then used many times.  For a variadic routine, it must be
     // created on each call to match the number and types of arguments.
@@ -74,7 +74,7 @@ enum {
     // A HANDLE! which is actually an array of ffi_type*, so a C array of
     // pointers.  This array was passed into the CIF at its creation time,
     // and it holds references to them as long as you use that CIF...so this
-    // array must survive as long as the CIF does.  BLANK! if variadic.
+    // array must survive as long as the CIF does.  SPACE if variadic.
     //
     IDX_ROUTINE_ARG_FFTYPES,
 
@@ -85,7 +85,7 @@ enum {
     IDX_ROUTINE_IS_VARIADIC,
 
     // ffi_closure which for a callback stores the place where the CFunction*
-    // lives, or BLANK! if the routine does not have a callback interface.
+    // lives, or SPACE if the routine does not have a callback interface.
     //
     IDX_ROUTINE_CLOSURE,
 
@@ -105,7 +105,7 @@ INLINE bool Is_Routine_Callback(RoutineDetails* r) {
         return true;
     assert(
         rebDid("library! = type of", Routine_At(r, IDX_ROUTINE_ORIGIN))
-        or Is_Blank(Routine_At(r, IDX_ROUTINE_ORIGIN))
+        or Is_Space(Routine_At(r, IDX_ROUTINE_ORIGIN))
     );
     return false;
 }
@@ -117,7 +117,7 @@ INLINE ffi_closure* Routine_Closure(RoutineDetails* r) {
 
 INLINE Option(Element*) Routine_Lib(RoutineDetails* r) {
     assert(not Is_Routine_Callback(r));
-    if (Is_Blank(Routine_At(r, IDX_ROUTINE_ORIGIN)))
+    if (Is_Space(Routine_At(r, IDX_ROUTINE_ORIGIN)))
         return nullptr;
     return Known_Element(Routine_At(r, IDX_ROUTINE_ORIGIN));
 }
@@ -128,7 +128,7 @@ INLINE Value* Routine_Callback_Action(RoutineDetails* r) {
 }
 
 INLINE Option(Element*) Routine_Return_Schema_Unless_Void(RoutineDetails* r) {
-    if (Is_Blank(Routine_At(r, IDX_ROUTINE_RET_SCHEMA)))
+    if (Is_Space(Routine_At(r, IDX_ROUTINE_RET_SCHEMA)))
         return nullptr;
     return Known_Element(Routine_At(r, IDX_ROUTINE_RET_SCHEMA));
 }
