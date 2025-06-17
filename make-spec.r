@@ -35,20 +35,20 @@ includes: compose [
     ; "make library! ..." etc., and gets POINTER! back.  So it does not
     ; need to do that any longer
     ;
-    (comment [make-file [(repo-dir) extensions/library /]])
+    (comment [compose %(repo-dir)/extensions/library/])
 
     ; Note: Vectors are used to model C array structures, and so you have
     ; to have the vector extension available if you're going to do any FFI
     ; with arrays.  But similar to the library extension, VECTOR! is now
     ; accessed through API calls with HANDLE!.
     ;
-    (comment [make-file [(repo-dir) extensions/vector /]])
+    (comment [compose %(repo-dir)/extensions/vector/])
 ]
 
 sources: [
-    %mod-ffi.c
-    %t-struct.c
-    %t-routine.c
+    mod-ffi.c
+    t-struct.c
+    t-routine.c
 ]
 
 comment [
