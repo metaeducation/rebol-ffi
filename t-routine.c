@@ -490,7 +490,7 @@ static Option(Error*) Trap_Cell_To_Ffi(
         // GC compaction even if not changed)...so the memory is not "stable".
         //
           case TYPE_TEXT:  // !!! copies a *pointer*!
-            buffer.ipt = i_cast(intptr_t, Cell_Utf8_At(arg));
+            buffer.ipt = i_cast(intptr_t, c_cast(Byte*, Cell_Utf8_At(arg)));
             break;
 
           case TYPE_BLOB:  // !!! copies a *pointer*!
