@@ -1477,8 +1477,7 @@ IMPLEMENT_GENERIC(EQUAL_Q, Is_Struct)
 
     Element* a = Element_ARG(VALUE1);
     Element* b = Element_ARG(VALUE2);
-    bool strict = Bool_ARG(STRICT);
-    UNUSED(strict);
+    UNUSED(Bool_ARG(RELAX));
 
     if (Cell_Struct_Fields_Array(a) != Cell_Struct_Fields_Array(b))
         return Init_Logic(OUT, false);
