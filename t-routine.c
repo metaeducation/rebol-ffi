@@ -1265,7 +1265,7 @@ Option(Error*) Trap_Alloc_Ffi_Action_For_Spec(
         else if (Is_Word(item)) {
             const Symbol* name = Cell_Word_Symbol(item);
 
-            if (Are_Synonyms(name, CANON(ELLIPSIS_1))) {  // variadic
+            if (Are_Synonyms(name, CANON(ELLIPSIS_3))) {  // variadic
                 if (is_variadic)
                     return Error_User("FFI: Duplicate ... indicating variadic");
 
