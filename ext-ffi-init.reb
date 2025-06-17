@@ -117,6 +117,8 @@ export make-callback: function [
         print ["r-args:" mold r-args]
     ]
 
+    fallback: default [0]  ; !!! TEMPORARY
+
     ; Wrapping process is a bit more complex in modern binding, because the
     ; block we get is already bound, and we need some mechanism to invasively
     ; "overbind" it or it will not see the function's arguments:
@@ -125,11 +127,13 @@ export make-callback: function [
     ;
     let safe: function r-args
         (if fallback [
-            compose2:deep @{} inside body '[
-                trap [return {as group! bindable body}] then error -> [
-                    print "** TRAPPED CRITICAL ERROR DURING FFI CALLBACK:"
+            compose2:deep '{} inside body '[
+                sys.util/rescue:relax [
+                    return {as group! bindable body}
+                ] then error -> [
+                    print "** RESCUED CRITICAL ERROR DURING FFI CALLBACK:"
                     print mold error
-                    return {^fallback}
+                    return '{fallback}
                 ]
             ]
         ] else [

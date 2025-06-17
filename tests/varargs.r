@@ -2,7 +2,7 @@ Rebol []
 
 recycle:torture
 
-libc: switch fourth system/version [
+libc: switch fourth system.version [
     3 [
         make library! %msvcrt.dll
     ]
@@ -28,7 +28,7 @@ sprintf: make-routine libc "sprintf" [
 
 i: 1000
 j: make struct! [x [double]]
-j/x: 12.34
+j.x: 12.34
 (printf
     join "1. i: %d, %f" newline
     i [int64]
@@ -40,11 +40,11 @@ j/x: 12.34
     (to integer! newline) [int8]
 )
 
-| printf
+, printf
     "3. hello %s%c"
     "world" [pointer]
     (to integer! newline) [int8]
-|
+,
 
 do compose [
     printf

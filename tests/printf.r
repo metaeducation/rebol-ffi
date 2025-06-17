@@ -1,6 +1,6 @@
 Rebol []
 
-recycle/torture
+recycle:torture
 
 
 libc: make library! switch system.platform.1 [
