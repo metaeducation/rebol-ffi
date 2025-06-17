@@ -43,7 +43,7 @@
 DECLARE_NATIVE(ALLOC_VALUE_POINTER)
 //
 // !!! Would it be better to not bother with the initial value parameter and
-// just start the cell out as nothing?
+// just start the cell out as unset?
 {
     INCLUDE_PARAMS_OF_ALLOC_VALUE_POINTER;
 
@@ -59,7 +59,7 @@ DECLARE_NATIVE(ALLOC_VALUE_POINTER)
 //
 //  "Free a cell that was allocated by ALLOC-VALUE-POINTER"
 //
-//      return: [~]
+//      return: []
 //      pointer [integer!]
 //  ]
 //
@@ -79,7 +79,7 @@ DECLARE_NATIVE(FREE_VALUE_POINTER)
 
     rebRelease(cell);  // unmanaged [1]
 
-    return NOTHING;
+    return TRIPWIRE;
 }
 
 
@@ -88,8 +88,7 @@ DECLARE_NATIVE(FREE_VALUE_POINTER)
 //
 //  "Get the contents of a cell, e.g. one returned by ALLOC-VALUE-POINTER"
 //
-//      return: "If the source looks up to a value, that value--else null"
-//          [~null~ any-value?]
+//      return: [any-value?]
 //      source "A pointer to a Rebol value"
 //          [integer!]
 //  ]
@@ -122,9 +121,9 @@ DECLARE_NATIVE(GET_AT_POINTER)
 //          [any-value?]
 //      target "A pointer to a Rebol value"
 //          [integer!]
-//      ^value "Value to assign"
+//      value "Value to assign"
 //          [any-value?]
-//      :any "Do not error on NOTHING! or TRIPWIRE!"
+//      :any "Do not error on TRASH!"
 //  ]
 //
 DECLARE_NATIVE(SET_AT_POINTER)
@@ -134,9 +133,9 @@ DECLARE_NATIVE(SET_AT_POINTER)
 {
     INCLUDE_PARAMS_OF_SET_AT_POINTER;
 
-    Value* v = Meta_Unquotify_Decayed(ARG(VALUE));
+    Value* v = ARG(VALUE);
 
-    if ((Is_Nothing(v) or Is_Tripwire(v)) and not Bool_ARG(ANY)) {
+    if (Is_Trash(v) and not Bool_ARG(ANY)) {
         // !!! current philosophy is to allow all assignments
     }
 
@@ -152,7 +151,7 @@ DECLARE_NATIVE(SET_AT_POINTER)
 //
 //  "Startup FFI Extension"
 //
-//      return: [~]
+//      return: []
 //  ]
 //
 DECLARE_NATIVE(STARTUP_P)
@@ -161,7 +160,7 @@ DECLARE_NATIVE(STARTUP_P)
 
     Register_Dispatcher(&Routine_Dispatcher, &Routine_Details_Querier);
 
-    return NOTHING;
+    return TRIPWIRE;
 }
 
 
@@ -170,12 +169,12 @@ DECLARE_NATIVE(STARTUP_P)
 //
 //  "Shutdown FFI Extensions"
 //
-//      return: [~]
+//      return: []
 //  ]
 //
 DECLARE_NATIVE(SHUTDOWN_P)
 {
     INCLUDE_PARAMS_OF_SHUTDOWN_P;
 
-    return NOTHING;
+    return TRIPWIRE;
 }

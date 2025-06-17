@@ -238,7 +238,7 @@ IMPLEMENT_GENERIC(MOLDIFY, Is_Struct)
 
     Append_Ascii(mo->string, "]");
 
-    return NOTHING;
+    return TRIPWIRE;
 }
 
 
@@ -1641,7 +1641,7 @@ DECLARE_NATIVE(MAKE_SIMILAR_STRUCT)
 //
 //  "Destroy the external memory associated the struct"
 //
-//      return: [~]
+//      return: []
 //      struct [struct!]
 //      :free "Specify the function to free the memory"
 //          [action!]  ; [1]
@@ -1671,5 +1671,5 @@ DECLARE_NATIVE(DESTROY_STRUCT_STORAGE)
     if (Bool_ARG(FREE))
         rebElide(rebRUN(ARG(FREE)), pointer);  // may not be routine [1]
 
-    return NOTHING;
+    return TRIPWIRE;
 }

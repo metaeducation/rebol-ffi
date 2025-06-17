@@ -41,7 +41,7 @@ static struct {
     Option(SymId) symid;
     const char* typespec;
 } syms_to_typesets[] = {
-    {SYM_VOID, "~"},
+    {SYM_VOID, "trash?"},  // TRASH is closest to C void (vs. Rebol VOID)
     {EXT_SYM_UINT8, "integer!"},
     {EXT_SYM_INT8, "integer!"},
     {EXT_SYM_UINT16, "integer!"},
@@ -52,7 +52,7 @@ static struct {
     {EXT_SYM_INT64, "integer!"},
     {EXT_SYM_FLOAT, "decimal!"},
     {EXT_SYM_DOUBLE, "decimal!"},
-    {EXT_SYM_POINTER, "~null~ integer! text! blob! vector! action!"},  // [1]
+    {EXT_SYM_POINTER, "null? integer! text! blob! vector! action!"},  // [1]
     {EXT_SYM_REBVAL, "any-value?"},
     {SYM_0, 0}
 };
@@ -991,7 +991,7 @@ Bounce Routine_Dispatcher(Level* const L)
     if (ret_schema)
         Ffi_To_Cell(OUT, unwrap ret_schema, ret_offset);
     else
-        Init_Nothing(OUT);  // ~ antiform is best return result for void
+        Init_Tripwire(OUT);  // !!! Is ~ antiform best return result for void?
 
     if (num_args != 0)
         Free_Unmanaged_Flex(arg_offsets);
