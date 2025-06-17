@@ -319,7 +319,7 @@ static Option(Error*) Trap_Set_Scalar_In_Struct_core(
 
         memcpy(data, Cell_Struct_Data_At(val), Field_Width(field));
 
-        return nullptr;
+        return SUCCESS;
     }
 
     // All other types take numbers
@@ -430,7 +430,7 @@ static Option(Error*) Trap_Set_Scalar_In_Struct_core(
         fail ("unknown Field_Type_Id()");
     }
 
-    return nullptr;
+    return SUCCESS;
 }
 
 
@@ -529,7 +529,7 @@ static Option(Error*) Trap_Parse_Struct_Attribute(
         ++attr;
     }
 
-    return nullptr;  // no error
+    return SUCCESS;
 }
 
 
@@ -571,7 +571,7 @@ static Option(Error*) Trap_Set_Struct_Storage_External(
         &cleanup_noop
     );
 
-    return nullptr;
+    return SUCCESS;
 }
 
 
@@ -867,7 +867,7 @@ static Option(Error*) Trap_Parse_Field_Type_May_Fail(
     else
         return Error_Invalid_Type_Raw(Datatype_Of(val));
 
-    return nullptr;
+    return SUCCESS;
 }
 
 
@@ -980,7 +980,7 @@ Option(Error*) Trap_Init_Struct_Fields(
         spec_item += 2;
     }
 
-    return nullptr;
+    return SUCCESS;
 }
 
 
@@ -1317,7 +1317,7 @@ Option(Error*) Trap_Make_Struct(Sink(Element) out, const Element* arg)
 
     Init_Struct(out, stu);
 
-    return nullptr;  // no error
+    return SUCCESS;
 }}
 
 

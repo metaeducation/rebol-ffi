@@ -194,7 +194,7 @@ static Option(Error*) Trap_Make_Schema_From_Block(
             );
             // TBD: constrain with STRUCT!
         }
-        return nullptr;  // no error
+        return SUCCESS;
     }
 
     if (Is_Struct(item)) {
@@ -206,7 +206,7 @@ static Option(Error*) Trap_Make_Schema_From_Block(
             );
             // TBD: constrain with STRUCT!
         }
-        return nullptr;  // no error
+        return SUCCESS;
     }
 
     if (Cell_Series_Len_At(block) != 1)
@@ -244,7 +244,7 @@ static Option(Error*) Trap_Make_Schema_From_Block(
         }
     }
 
-    return nullptr;  // no error
+    return SUCCESS;
 }
 
 
@@ -331,7 +331,7 @@ static Option(Error*) Trap_Cell_To_Ffi(
             // Return values don't have an incoming argument to fill into the
             // calling frame.
             //
-            return nullptr;  // no error
+            return SUCCESS;
         }
 
         // !!! There wasn't any compatibility checking here before (not even
@@ -352,7 +352,7 @@ static Option(Error*) Trap_Cell_To_Ffi(
         memcpy(dest, Cell_Struct_Data_At(arg), size);
 
         Term_Binary_Len(store, *offset_out + size);
-        return nullptr;  // no error
+        return SUCCESS;
     }
 
     assert(Is_Word(schema));
@@ -583,7 +583,7 @@ static Option(Error*) Trap_Cell_To_Ffi(
     if (store)
         Term_Binary_Len(store, *offset_out + size);
 
-    return nullptr;
+    return SUCCESS;
 }
 
 
@@ -1359,7 +1359,7 @@ Option(Error*) Trap_Alloc_Ffi_Action_For_Spec(
         Init_Unreadable(Routine_At(r, IDX_ROUTINE_CIF));
         Init_Unreadable(Routine_At(r, IDX_ROUTINE_ARG_FFTYPES));
         *out = r;
-        return nullptr;  // no error
+        return SUCCESS;
     }
 
     ffi_cif* cif = Try_Alloc_Memory(ffi_cif);
@@ -1407,7 +1407,7 @@ Option(Error*) Trap_Alloc_Ffi_Action_For_Spec(
         );  // lifetime must match cif lifetime
 
     *out = r;
-    return nullptr;  // no error
+    return SUCCESS;
 }}
 
 
