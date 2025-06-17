@@ -1,8 +1,8 @@
 //
-//  File: %stub-routine.h
-//  Summary: "Definitions for Routines (Callbacks and CFunction Interfaces)"
-//  Project: "Rebol 3 Interpreter and Run-time (Ren-C branch)"
-//  Homepage: https://github.com/metaeducation/ren-c/
+//  file: %stub-routine.h
+//  summary: "Definitions for Routines (Callbacks and CFunction Interfaces)"
+//  project: "Rebol 3 Interpreter and Run-time (Ren-C branch)"
+//  homepage: https://github.com/metaeducation/ren-c/
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //

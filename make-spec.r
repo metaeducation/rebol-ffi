@@ -1,8 +1,8 @@
-REBOL [
-    Name: FFI
-    Notes: "See %extensions/README.md for the format and fields of this file"
+Rebol [
+    name: FFI
+    notes: "See %extensions/README.md for the format and fields of this file"
 
-    Extended-Words: [
+    extended-words: [
         struct!
         uint8 int8
         uint16 int16
@@ -17,7 +17,7 @@ REBOL [
         varargs  ; used as the name of synthesized variadic argument
     ]
 
-    Extended-Types: [struct! library! vector!]
+    extended-types: [struct! library! vector!]
 ]
 
 

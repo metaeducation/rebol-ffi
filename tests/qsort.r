@@ -1,8 +1,8 @@
 Rebol [
-    Title: "Callback demonstration for FFI extension: Quicksort"
-    File: %qsort.r
+    title: "Callback demonstration for FFI extension: Quicksort"
+    file: %qsort.r
 
-    Description: --{
+    description: --[
         qsort() is defined in the standard C library in <stdlib.h>.  It can be
         used to sort an array of arbitrary data by passing it a pointer to a
         C function which serves as the comparison operator.  Using only the
@@ -27,9 +27,9 @@ Rebol [
         Rebol function be called from C, with particular expectations of the
         C data types used to invoke it.  The parameter language and supported
         types used is the same as that in MAKE-ROUTINE.
-    }--
+    ]--
 
-    Notes: --{
+    notes: --[
         The C language does not have strict typing rules for the arguments
         to functions passed by pointer.  This means when a function takes a
         function pointer as an argument, there's not enough information in
@@ -41,14 +41,14 @@ Rebol [
         would be at odds with how the language may work.  e.g. another one
         of the function's parameters may dictate the choice of what type of
         parameter the callback receives.
-    }--
+    ]--
 
-    See-Also: --{
+    see-also: --[
         "user natives", which embed a TCC compiler into the Rebol
         executable.  This provides an alternative for those who would prefer
         to write their callbacks directly in C, yet still include that C
         source in a Rebol module.
-    }--
+    ]--
 ]
 
 recycle:torture

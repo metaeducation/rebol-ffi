@@ -1,7 +1,7 @@
-REBOL [
-    Title: "Demo tunneling of Cell* through routine to callback in FFI"
+Rebol [
+    title: "Demo tunneling of Cell* through routine to callback in FFI"
 
-    Description: --{
+    description: --[
         There are two versions of quicksort in the C library.  Plain `qsort`
         is written in such a way that if your comparator needs any information
         besides the two items to compare, it has to get that from global
@@ -15,12 +15,12 @@ REBOL [
         are not linked to any Rebol APIs (and hence would not be able to
         make use of a Cell), this shows the use of it to "tunnel" a
         Rebol value through to a written-in-Rebol comparator callback.
-    }--
+    ]--
 
-    See-Also: --{
+    see-also: --[
         More details about callbacks are mentioned in the demo file for the
         "plain" qsort, in the %qsort.r demo file.
-    }--
+    ]--
 ]
 
 recycle:torture

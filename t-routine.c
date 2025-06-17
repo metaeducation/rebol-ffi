@@ -1,9 +1,9 @@
 //
-//  File: %t-routine.c
-//  Summary: "Support for calling non-Rebol C functions in DLLs w/Rebol args)"
-//  Section: datatypes
-//  Project: "Rebol 3 Interpreter and Run-time (Ren-C branch)"
-//  Homepage: https://github.com/metaeducation/ren-c/
+//  file: %t-routine.c
+//  summary: "Support for calling non-Rebol C functions in DLLs w/Rebol args)"
+//  section: datatypes
+//  project: "Rebol 3 Interpreter and Run-time (Ren-C branch)"
+//  homepage: https://github.com/metaeducation/ren-c/
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //

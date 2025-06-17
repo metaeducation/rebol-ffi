@@ -1,11 +1,11 @@
-REBOL [
-    Title: "FFI Extension"
-    Name: FFI
-    Type: Module
-    Version: 1.0.0
-    License: "Apache 2.0"
+Rebol [
+    title: "FFI Extension"
+    name: FFI
+    type: module
+    version: 1.0.0
+    license: "Apache 2.0"
 
-    Notes: --{
+    notes: --[
         The FFI was not initially implemented with any usermode code.  But
         just as with the routines in the SYS context, there's opportunity for
         replacing some of the non-performance-critical C that does parsing and
@@ -13,7 +13,7 @@ REBOL [
         to use fewer specialized structures to represent ROUTINE! and
         STRUCT!, instead using arrays...to permit it to be factored into an
         extension.
-    }--
+    ]--
 ]
 
 ffi-type-mappings: [

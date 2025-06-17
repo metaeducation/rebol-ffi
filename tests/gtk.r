@@ -1,8 +1,8 @@
-REBOL [
-    Title: "Small GTK3 Smoke Test"
-    Author: "Shixin Zeng"
+Rebol [
+    title: "Small GTK3 Smoke Test"
+    author: "Shixin Zeng"
 
-    Description: --{
+    description: --[
         This is a minimal GTK3 test, just enough to bring up a window and
         show it counting when you click a button.
 
@@ -10,9 +10,9 @@ REBOL [
         import of GTK's interfaces at the 2019 conference:
 
           https://youtu.be/fMeTqPyrNF4?t=1259
-    }--
+    ]--
 
-    Notes: --{
+    notes: --[
       * GTK4 was released in late 2020, but GTK3 is still in wide use by major
         projects in 2025 with no pressing plans to migrate, e.g. Chrome,
         Firefox, Inkscape, GIMP, and Handbrake.
@@ -20,7 +20,7 @@ REBOL [
       * GTK3 integer/boolean types are 32-bit by design, to keep API/ABI
         stability across platforms and ensure consistent behavior between
         32-bit and 64-bit systems.
-    }--
+    ]--
 ]
 
 recycle:torture

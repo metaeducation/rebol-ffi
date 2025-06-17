@@ -1,4 +1,4 @@
-REBOL []
+Rebol []
 
 recycle:torture
 
