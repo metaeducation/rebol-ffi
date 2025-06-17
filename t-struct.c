@@ -1340,20 +1340,12 @@ IMPLEMENT_GENERIC(MAKE, Is_Struct)
 }
 
 
-// 1. Structs contain packed data for the field type in an array.  If you
-//    don't have the VECTOR! type loaded, we could only return this as a
-//    BINARY! which wouldn't be that useful.  Not only could a VECTOR!
-//    conceivably store and interpret the extracted data, but it might be
-//    able to use the raw pointer into the struct.
-//
-//    For now, the information is expaned out and translated into a BLOCK!.
-//
-IMPLEMENT_GENERIC(PICK, Is_Struct)
+IMPLEMENT_GENERIC(TWEAK_P, Is_Struct)
 {
-    INCLUDE_PARAMS_OF_PICK;
+    INCLUDE_PARAMS_OF_TWEAK_P;
 
     Element* location = Element_ARG(LOCATION);
-    Element* picker = Element_ARG(PICKER);
+    Value* picker = ARG(PICKER);
 
     if (not Is_Word(picker))
         return PANIC(PARAM(PICKER));
@@ -1365,6 +1357,28 @@ IMPLEMENT_GENERIC(PICK, Is_Struct)
     Element* fields_tail = Array_Tail(fieldlist);
     Element* fields_item = Array_Head(fieldlist);
 
+    Value* dual = ARG(DUAL);
+    if (Not_Lifted(dual)) {
+        if (Is_Dual_Nulled_Pick_Signal(dual))
+            goto handle_pick;
+
+        return PANIC(Error_Bad_Poke_Dual_Raw(dual));
+    }
+
+    goto handle_poke;
+
+  handle_pick: { /////////////////////////////////////////////////////////////
+
+  // 1. Structs contain packed data for the field type in an array.  If you
+  //    don't have the VECTOR! type loaded, we could only return this as a
+  //    BINARY! which wouldn't be that useful.  Not only could a VECTOR!
+  //    conceivably store and interpret the extracted data, but it might be
+  //    able to use the raw pointer into the struct.
+  //
+  //    For now, the information is expaned out and translated into a BLOCK!.
+  //
+  // !!! TBD: Should be an accessor.
+
     for (; fields_item != fields_tail; ++fields_item) {
         StructField* field = Cell_Array_Known_Mutable(fields_item);
         Option(const Symbol*) field_name = Field_Name(field);
@@ -1373,7 +1387,7 @@ IMPLEMENT_GENERIC(PICK, Is_Struct)
 
         if (not Field_Is_C_Array(field)) {
             Get_Scalar_In_Struct(OUT, stu, field, 0);  // index 0
-            return OUT;
+            return DUAL_LIFTED(OUT);
         }
 
         REBLEN dimension = Field_Dimension(field);
@@ -1388,29 +1402,19 @@ IMPLEMENT_GENERIC(PICK, Is_Struct)
             Copy_Cell(Array_At(arr, n), Known_Element(scalar));
         }
 
-        return Init_Block(OUT, arr);
+        return DUAL_LIFTED(Init_Block(OUT, arr));
     }
 
-    return RAISE(Error_Bad_Pick_Raw(picker));  // TRY can suppress
-}
+    return DUAL_SIGNAL_NULL_ABSENT;
 
+} handle_poke: { /////////////////////////////////////////////////////////////
 
-IMPLEMENT_GENERIC(POKE, Is_Struct)
-{
-    INCLUDE_PARAMS_OF_POKE;
+    Unliftify_Known_Stable(dual);
 
-    Element* location = Element_ARG(LOCATION);
-    Element* picker = Element_ARG(PICKER);
-    Value* poke = Element_ARG(VALUE);
+    if (Is_Antiform(dual))
+        return PANIC(Error_Bad_Antiform(dual));
 
-    StructInstance* stu = Cell_Struct(location);
-
-    if (not Is_Word(picker))
-        return FAIL(PARAM(PICKER));
-
-    Array* fieldlist = Struct_Fields_Array(stu);
-    Element* fields_item = Array_Head(fieldlist);
-    Element* fields_tail = Array_Tail(fieldlist);
+    Element* poke = Known_Element(dual);
 
     for (; fields_item != fields_tail; ++fields_item) {
         StructField* field = Cell_Array_Known_Mutable(fields_item);
@@ -1422,7 +1426,7 @@ IMPLEMENT_GENERIC(POKE, Is_Struct)
             Option(Error*) e = Trap_Set_Scalar_In_Struct(stu, field, 0, poke);
             if (e)
                 return PANIC(unwrap e);
-            return nullptr;  // no need to write back
+            return NO_WRITEBACK_NEEDED;
         }
 
         if (Is_Blob(poke)) {
@@ -1462,8 +1466,8 @@ IMPLEMENT_GENERIC(POKE, Is_Struct)
         }
     }
 
-    return nullptr;
-}
+    return NO_WRITEBACK_NEEDED;
+}}
 
 
 IMPLEMENT_GENERIC(EQUAL_Q, Is_Struct)
