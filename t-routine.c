@@ -760,10 +760,11 @@ Bounce Routine_Dispatcher(Level* const L)
             return THROWN;
         }
 
-        if (Is_Barrier(OUT))
+        if (Is_Ghost(OUT))
             break;
 
-        Copy_Cell(PUSH(), stable_OUT);
+        Value* out = Decay_If_Unstable(OUT);
+        Copy_Cell(PUSH(), out);
     } while (true);
 
     if ((TOP_INDEX - base) % 2 != 0)  // must be paired [1]
@@ -1105,8 +1106,8 @@ void callback_dispatcher(  // client C code calls this, not the trampoline
 
     Source* arr = Make_Source(1 + cif->nargs);
     Element* elem = Array_Head(arr);
-    Copy_Meta_Cell(elem, Routine_Callback_Action(r));
-    QUOTE_BYTE(elem) = NOQUOTE_1;
+    Copy_Lifted_Cell(elem, Routine_Callback_Action(r));
+    LIFT_BYTE(elem) = NOQUOTE_1;
     assert(Is_Frame(elem));
 
     ++elem;
@@ -1115,7 +1116,7 @@ void callback_dispatcher(  // client C code calls this, not the trampoline
     for (i = 0; i != cif->nargs; ++i, ++elem) {
         DECLARE_VALUE (value);
         Ffi_To_Cell(value, Routine_Arg_Schema(r, i), args[i]);
-        Copy_Meta_Cell(elem, value);
+        Copy_Lifted_Cell(elem, value);
     }
 
     Set_Flex_Len(arr, 1 + cif->nargs);
