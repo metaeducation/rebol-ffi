@@ -1051,19 +1051,21 @@ bool Routine_Details_Querier(
 // reference is likely--in the ACT_BODY of the callback, but still this is
 // how the GC gets hooked in Ren-C)
 //
-void cleanup_ffi_closure(const Value* closure_handle) {
-    ffi_closure_free(Cell_Handle_Pointer(ffi_closure, closure_handle));
+void cleanup_ffi_closure(void* p, size_t length) {
+    UNUSED(length);
+    ffi_closure* closure = cast(ffi_closure*, p);
+    ffi_closure_free(closure);
 }
 
-static void cleanup_cif(const Value* cif_handle) {
-    Free_Memory(ffi_cif, Cell_Handle_Pointer(ffi_cif, cif_handle));
+static void cleanup_cif(void* p, size_t length) {
+    UNUSED(length);
+    ffi_cif* cif = cast(ffi_cif*, p);
+    Free_Memory(ffi_cif, cif);
 }
 
-static void cleanup_args_fftypes(const Value* fftypes_handle) {
-    Free_Memory_N(ffi_type*,
-        Cell_Handle_Len(fftypes_handle),
-        Cell_Handle_Pointer(ffi_type*, fftypes_handle)
-    );
+static void cleanup_args_fftypes(void* p, size_t length) {
+    ffi_type** fftypes = cast(ffi_type**, p);
+    Free_Memory_N(ffi_type*, length, fftypes);
 }
 
 

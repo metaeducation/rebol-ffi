@@ -34,8 +34,9 @@
 // that do not have to be freed, so they use simple HANDLE! which do not
 // register this cleanup hook.
 //
-static void cleanup_ffi_type(const Value* v) {
-    ffi_type *fftype = Cell_Handle_Pointer(ffi_type, v);
+static void cleanup_ffi_type(void* p, size_t length) {
+    UNUSED(length);
+    ffi_type *fftype = cast(ffi_type*, p);
     if (fftype->type == FFI_TYPE_STRUCT)
         free(fftype->elements);
     free(fftype);
@@ -236,7 +237,7 @@ IMPLEMENT_GENERIC(MOLDIFY, Is_Struct)
     Mold_Array_At(mo, array, 0, "[]");
     Free_Unmanaged_Flex(array);
 
-    End_Non_Lexical_Mold(mo, "]");
+    End_Non_Lexical_Mold(mo);
 
     return TRIPWIRE;
 }
@@ -536,9 +537,9 @@ static Option(Error*) Trap_Parse_Struct_Attribute(
 // The managed handle logic always assumes a cleanup function, so it doesn't
 // have to test for nullptr.
 //
-static void cleanup_noop(const Value* v) {
-    assert(Is_Handle(v));
-    UNUSED(v);
+static void cleanup_noop(void* p, size_t length) {
+    UNUSED(p);
+    UNUSED(length);
 }
 
 
