@@ -230,13 +230,13 @@ IMPLEMENT_GENERIC(MOLDIFY, Is_Struct)
 
     UNUSED(form); // no difference between MOLD and FORM at this time
 
-    Append_Ascii(mo->string, "#[struct! ");
+    Begin_Non_Lexical_Mold(mo, cell);
 
     Array* array = Struct_To_Array(Cell_Struct(cell));
     Mold_Array_At(mo, array, 0, "[]");
     Free_Unmanaged_Flex(array);
 
-    Append_Ascii(mo->string, "]");
+    End_Non_Lexical_Mold(mo, "]");
 
     return TRIPWIRE;
 }
