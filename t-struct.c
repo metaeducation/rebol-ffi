@@ -123,7 +123,7 @@ static void Get_Scalar_In_Struct(
 
       default:
         assert(false);
-        fail ("Unknown FFI type indicator");
+        panic ("Unknown FFI type indicator");
     }
 }
 
@@ -133,7 +133,7 @@ static void Get_Scalar_In_Struct(
 //
 // Used by MOLD to create a block.
 //
-// Cannot fail(), because fail() could call MOLD on a struct!, which will end
+// Cannot panic(), because panic() could call MOLD on a struct!, which will end
 // up infinitive recursive calls.
 //
 Source* Struct_To_Array(StructInstance* stu)
@@ -149,7 +149,7 @@ Source* Struct_To_Array(StructInstance* stu)
 
         Option(const Symbol*) name = Field_Name(field);
         if (not name)
-            fail ("Anonymous fields not supported yet in Struct_To_Array()");
+            panic ("Anonymous fields not supported yet in Struct_To_Array()");
         Init_Set_Word(PUSH(), unwrap name); // required name
 
         Source* typespec = Make_Source(2); // required type
@@ -200,7 +200,7 @@ Source* Struct_To_Array(StructInstance* stu)
                 DECLARE_VALUE (scalar);
                 Get_Scalar_In_Struct(scalar, stu, field, n);
                 if (Is_Antiform(scalar))
-                    fail ("Can't put antiform in block for Struct_To_Array()");
+                    panic ("Can't put antiform in block for Struct_To_Array()");
                 Copy_Cell(Array_At(init, n), cast(Element*, scalar));
             }
             Init_Block(Alloc_Tail_Array(typespec), init);
@@ -209,7 +209,7 @@ Source* Struct_To_Array(StructInstance* stu)
             DECLARE_VALUE (scalar);
             Get_Scalar_In_Struct(scalar, stu, field, 0);
             if (Is_Antiform(scalar))
-                fail ("Can't put antiform in block for Struct_To_Array()");
+                panic ("Can't put antiform in block for Struct_To_Array()");
             Copy_Cell(Alloc_Tail_Array(typespec), Known_Element(scalar));
         }
 
@@ -427,7 +427,7 @@ static Option(Error*) Trap_Set_Scalar_In_Struct_core(
 
       default:
         assert(false);  // should not happen
-        fail ("unknown Field_Type_Id()");
+        panic ("unknown Field_Type_Id()");
     }
 
     return SUCCESS;
@@ -502,7 +502,7 @@ static Option(Error*) Trap_Parse_Struct_Attribute(
                 return Error_Bad_Value(linkname);
 
             RebolValue* result = rebEntrap("pick", lib, linkname);
-            if (Is_Error(result))
+            if (Is_Warning(result))
                 return Cell_Error(result);
 
             Unquotify(Known_Element(result));
@@ -516,7 +516,7 @@ static Option(Error*) Trap_Parse_Struct_Attribute(
         case EXT_SYM_ALIGNMENT:
             ++ attr;
             if (not Is_Integer(attr))
-                fail (attr);
+                panic (attr);
 
             alignment = VAL_INT64(attr);
             break;
@@ -684,7 +684,7 @@ static void Prepare_Field_For_Ffi(StructField* schema)
 // will actually be creating a new `inner` STRUCT! value.  Since this value
 // is managed and not referred to elsewhere, there can't be evaluations.
 //
-static Option(Error*) Trap_Parse_Field_Type_May_Fail(
+static Option(Error*) Trap_Parse_Field_Type_May_Panic(
     StructField* field,
     const Element* spec,
     Sink(Element) inner  // will be set only if STRUCT!
@@ -762,7 +762,7 @@ static Option(Error*) Trap_Parse_Field_Type_May_Fail(
           case EXT_SYM_STRUCT_X: {
             ++val;
             if (not Is_Block(val))
-                fail (Error_Unexpected_Type(TYPE_BLOCK, Datatype_Of(val)));
+                panic (Error_Unexpected_Type(TYPE_BLOCK, Datatype_Of(val)));
 
             DECLARE_ELEMENT (specific);
             Derelativize(specific, val, Cell_List_Binding(spec));
@@ -814,7 +814,7 @@ static Option(Error*) Trap_Parse_Field_Type_May_Fail(
             break; }
 
           default:
-            fail (val);
+            panic (val);
         }
     }
     else if (Is_Struct(val)) {
@@ -1145,7 +1145,7 @@ Option(Error*) Trap_Make_Struct(Sink(Element) out, const Element* arg)
 
     // Fills in the width, dimension, type, and ffi_type (if needed)
     //
-    Option(Error*) e = Trap_Parse_Field_Type_May_Fail(field, spec, init);
+    Option(Error*) e = Trap_Parse_Field_Type_May_Panic(field, spec, init);
     if (e)
         return unwrap e;
 
@@ -1330,11 +1330,11 @@ IMPLEMENT_GENERIC(MAKE, Is_Struct)
     Element* arg = Element_ARG(DEF);
 
     if (not Is_Block(arg))
-        return FAIL(PARAM(DEF));
+        return PANIC(PARAM(DEF));
 
     Option(Error*) e = Trap_Make_Struct(OUT, arg);
     if (e)
-        return FAIL(unwrap e);
+        return PANIC(unwrap e);
 
     return OUT;
 }
@@ -1356,7 +1356,7 @@ IMPLEMENT_GENERIC(PICK, Is_Struct)
     Element* picker = Element_ARG(PICKER);
 
     if (not Is_Word(picker))
-        return FAIL(PARAM(PICKER));
+        return PANIC(PARAM(PICKER));
 
     StructInstance* stu = Cell_Struct(location);
 
@@ -1384,7 +1384,7 @@ IMPLEMENT_GENERIC(PICK, Is_Struct)
             DECLARE_VALUE (scalar);
             Get_Scalar_In_Struct(scalar, stu, field, n);
             if (Is_Antiform(scalar))
-                return FAIL("Antiforms can't be put in block for PICK");
+                return PANIC("Antiforms can't be put in block for PICK");
             Copy_Cell(Array_At(arr, n), Known_Element(scalar));
         }
 
@@ -1421,19 +1421,19 @@ IMPLEMENT_GENERIC(POKE, Is_Struct)
         if (not Field_Is_C_Array(field)) {
             Option(Error*) e = Trap_Set_Scalar_In_Struct(stu, field, 0, poke);
             if (e)
-                return FAIL(unwrap e);
+                return PANIC(unwrap e);
             return nullptr;  // no need to write back
         }
 
         if (Is_Blob(poke)) {
             if (Field_Width(field) != 1)
-                return FAIL(
+                return PANIC(
                     "Setting array field to BLOB! requires element width of 1"
                 );
             Size size;
             const Byte* bytes = Cell_Blob_Size_At(&size, poke);
             if (Field_Dimension(field) != size)
-                return FAIL(
+                return PANIC(
                     "Setting field to BLOB! requires equal size (for now)"
                 );
 
@@ -1447,18 +1447,18 @@ IMPLEMENT_GENERIC(POKE, Is_Struct)
         }
 
         if (not Is_Block(poke))
-            return FAIL("Setting array field in STRUCT! requires BLOCK! atm");
+            return PANIC("Setting array field in STRUCT! requires BLOCK! atm");
 
         REBLEN dimension = Field_Dimension(field);
         if (dimension != Cell_Series_Len_At(poke))
-            return FAIL("Dimension mismatch of array field");
+            return PANIC("Dimension mismatch of array field");
 
         const Element* at = Cell_List_Item_At(poke);
         REBLEN n = 0;
         for(n = 0; n < dimension; ++n, ++at) {
             Option(Error*) e = Trap_Set_Scalar_In_Struct(stu, field, n, at);
             if (e)
-                return FAIL(unwrap e);
+                return PANIC(unwrap e);
         }
     }
 
@@ -1525,10 +1525,10 @@ IMPLEMENT_GENERIC(OLDGENERIC, Is_Struct)
       case SYM_CHANGE: {
         Value* arg = ARG_N(2);
         if (not Is_Blob(arg))
-            return FAIL(Error_Unexpected_Type(TYPE_BLOB, Datatype_Of(arg)));
+            return PANIC(Error_Unexpected_Type(TYPE_BLOB, Datatype_Of(arg)));
 
         if (Cell_Series_Len_At(arg) != Cell_Struct_Data_Size(val))
-            return FAIL(arg);
+            return PANIC(arg);
 
         memcpy(
             Cell_Struct_Data_Head(val),
@@ -1630,7 +1630,7 @@ DECLARE_NATIVE(MAKE_SIMILAR_STRUCT)
 
     Option(Error*) e = Trap_Init_Struct_Fields(OUT, body);
     if (e)
-        return FAIL(unwrap e);
+        return PANIC(unwrap e);
 
     return OUT;
 }
@@ -1656,7 +1656,7 @@ DECLARE_NATIVE(DESTROY_STRUCT_STORAGE)
     INCLUDE_PARAMS_OF_DESTROY_STRUCT_STORAGE;
 
     if (Is_Blob(Struct_Storage(Cell_Struct(ARG(STRUCT)))))
-        return FAIL("Can't use external storage with DESTROY-STRUCT-STORAGE");
+        return PANIC("Can't use external storage with DESTROY-STRUCT-STORAGE");
 
     Element* handle = Struct_Storage(Cell_Struct(ARG(STRUCT)));
 
@@ -1664,7 +1664,7 @@ DECLARE_NATIVE(DESTROY_STRUCT_STORAGE)
     Init_Integer(pointer, i_cast(intptr_t, Cell_Handle_Pointer(void, handle)));
 
     if (Cell_Handle_Len(handle) == 0)
-        return FAIL("DESTROY-STRUCT-STORAGE given already destroyed handle");
+        return PANIC("DESTROY-STRUCT-STORAGE given already destroyed handle");
 
     CELL_HANDLE_LENGTH_U(handle) = 0;  // !!! assert correct for mem block size
 

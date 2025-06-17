@@ -76,7 +76,7 @@ export make-callback: function [
     return: [action!]
     args [block!]
     body [block!]
-    :fallback "If untrapped failure occurs during callback, return value"
+    :fallback "If untrapped panic occurs during callback, return value"
         [any-value?]
 ][
     let r-args: copy []
@@ -93,7 +93,7 @@ export make-callback: function [
     ; !!! TBD: Should check fallback value for compatibility here, e.g.
     ; make sure [return: [pointer]] has a fallback value that's an INTEGER!.
     ; Because if an improper type is given as the reaction to an error, that
-    ; just creates *another* error...so you'll still get a panic() anyway.
+    ; just creates *another* error...so you'll still get a crash() anyway.
     ; Better to just FAIL during the MAKE-CALLBACK call so the interpreter
     ; does not crash.
     ;
@@ -110,7 +110,7 @@ export make-callback: function [
         opt some [arg-rule | attr-rule]
         <end>
     ] except [
-        fail ["Unrecognized pattern in MAKE-CALLBACK function spec" args]
+        panic ["Unrecognized pattern in MAKE-CALLBACK function spec" args]
     ]
 
     comment [

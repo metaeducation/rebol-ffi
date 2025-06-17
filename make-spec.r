@@ -76,12 +76,12 @@ comment [
                 ]
             ]
         ]
-        _ 'no 'off 'false #[false] [
-            ;pass
+        'none [
+            noop
         ]
 
-        fail [
-            "WITH-FFI should be one of [dynamic static no]"
+        panic [
+            "WITH-FFI should be one of [dynamic static none]"
             "not" (user-config/with-ffi)
         ]
     ]

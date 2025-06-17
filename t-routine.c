@@ -131,7 +131,7 @@ static ffi_abi Abi_From_Word_Or_Nulled(const Value* word) {
 
       #endif  // X86_WIN64
 
-        "fail [-{Unknown ABI for platform:}- @", word, "]",
+        "panic [-[Unknown ABI for platform:]- @", word, "]",
       "]",
       rebEND  // <-- rebEND required, rebUnboxInteger_c89() is not a macro
     );
@@ -507,7 +507,7 @@ static Option(Error*) Trap_Cell_To_Ffi(
             CFunction* cfunc = Routine_C_Function(r);
             size_t sizeof_cfunc = sizeof(cfunc);  // avoid conditional const
             if (sizeof_cfunc != sizeof(intptr_t))  // not necessarily true
-                fail ("intptr_t size not equal to function pointer size");
+                panic ("intptr_t size not equal to function pointer size");
             memcpy(&buffer.ipt, &cfunc, sizeof(intptr_t));
             break; }
 
@@ -687,7 +687,7 @@ static void Ffi_To_Cell(
         //
         // !!! Was reporting Error_Invalid_Arg on uninitialized `out`
         //
-        fail ("Unknown FFI type indicator");
+        panic ("Unknown FFI type indicator");
     }
 }
 
@@ -710,7 +710,7 @@ Bounce Routine_Dispatcher(Level* const L)
     }
     else {
         if (rebNot("open?", unwrap Routine_Lib(r)))
-            return FAIL("Library closed in Routine_Dispatcher()");
+            return PANIC("Library closed in Routine_Dispatcher()");
     }
 
     Count num_fixed = Routine_Num_Fixed_Args(r);
@@ -767,7 +767,7 @@ Bounce Routine_Dispatcher(Level* const L)
     } while (true);
 
     if ((TOP_INDEX - base) % 2 != 0)  // must be paired [1]
-        return FAIL("Variadic FFI functions must alternate blocks and values");
+        return PANIC("Variadic FFI functions must alternate blocks and values");
 
     num_variable = (TOP_INDEX - base) / 2;
     num_args += num_variable;
@@ -808,7 +808,7 @@ Bounce Routine_Dispatcher(Level* const L)
             param
         );
         if (e)
-            return FAIL(unwrap e);
+            return PANIC(unwrap e);
         ret_offset = p_cast(void*, offset);
     }
     else
@@ -828,7 +828,7 @@ Bounce Routine_Dispatcher(Level* const L)
     // typechecked in the call).  But a STRUCT! might not be compatible with
     // the type of STRUCT! in the parameter specification.  They might also be
     // out of range, e.g. a too-large or negative INTEGER! passed to a uint8.
-    // So we could fail here.
+    // So we could panic here.
     //
     // 1. We will convert this offset to a pointer later.
 
@@ -853,7 +853,7 @@ Bounce Routine_Dispatcher(Level* const L)
             param
         );
         if (e)
-            return FAIL(unwrap e);
+            return PANIC(unwrap e);
 
         *Flex_At(void*, arg_offsets, i) = p_cast(void*, offset);  // offset [1]
     }
@@ -906,7 +906,7 @@ Bounce Routine_Dispatcher(Level* const L)
                 varargs_symbol  // symbol will appear in error reports
             );
             if (e1)
-                return FAIL(unwrap e1);
+                return PANIC(unwrap e1);
 
             args_fftypes[i] = Schema_Ffi_Type(schema);
 
@@ -923,7 +923,7 @@ Bounce Routine_Dispatcher(Level* const L)
                 param
             );
             if (e2)
-                return FAIL(unwrap e2);
+                return PANIC(unwrap e2);
 
             *Flex_At(void*, arg_offsets, i) = p_cast(void*, offset);
         }
@@ -945,9 +945,9 @@ Bounce Routine_Dispatcher(Level* const L)
         );
 
         if (status != FFI_OK) {
-            rebFree(cif);  // would free automatically on fail
-            rebFree(args_fftypes);  // would free automatically on fail
-            return FAIL(Error_User("FFI: Couldn't prep CIF_VAR"));
+            rebFree(cif);  // would free automatically on panic
+            rebFree(args_fftypes);  // would free automatically on panic
+            return PANIC(Error_User("FFI: Couldn't prep CIF_VAR"));
         }
     }
 
@@ -973,10 +973,9 @@ Bounce Routine_Dispatcher(Level* const L)
 
     // Note that the "offsets" are now direct pointers.  Also note that
     // any callbacks which run Rebol code during the course of calling this
-    // arbitrary C code are not allowed to propagate failures out of the
-    // callback--they'll panic and crash the interpreter, since they don't
-    // know what to do otherwise.  See MAKE-CALLBACK/FALLBACK for some
-    // mitigation of this problem.
+    // arbitrary C code are not allowed to propagate panics out of the
+    // callback--they'll crash() the interpreter, since they don't know what
+    // to do otherwise.  See MAKE-CALLBACK/FALLBACK for some mitigation.
 
     ffi_call(
         cif,
@@ -1082,7 +1081,7 @@ static void cleanup_args_fftypes(const Value* fftypes_handle) {
 //
 // 1. We pass a RoutineDetails*, but if we passed an actual Value* of the
 //    routine's ACTION! we could have access to the cached symbol for error
-//    reporting (which may just be a panic() here, but useful even so).
+//    reporting (which may just be a crash() here, but useful even so).
 //
 void callback_dispatcher(  // client C code calls this, not the trampoline
     ffi_cif* cif,
@@ -1125,9 +1124,9 @@ void callback_dispatcher(  // client C code calls this, not the trampoline
 
     DECLARE_ATOM (result);
 
-  RESCUE_SCOPE_IN_CASE_OF_ABRUPT_FAILURE {  //////////////////////////////////
+  RESCUE_SCOPE_IN_CASE_OF_ABRUPT_PANIC {  ////////////////////////////////////
 
-    // 1. If a callback encounters an un-trapped fail() in mid-run, or if the
+    // 1. If a callback encounters an un-trapped panic() in mid-run, or if the
     //    execution attempts to throw (e.g. CONTINUE or THROW natives called)
     //    there's nothing we can do here to guess what its C contract return
     //    value should be.  And we can't just jump up to the next trap point,
@@ -1137,16 +1136,16 @@ void callback_dispatcher(  // client C code calls this, not the trampoline
     //    See MAKE-CALLBACK:FALLBACK for the usermode workaround.
 
     if (Eval_Any_List_At_Throws(result, code, SPECIFIED))
-        panic (Error_No_Catch_For_Throw(TOP_LEVEL));  // THROW, CONTINUE... [1]
+        crash (Error_No_Catch_For_Throw(TOP_LEVEL));  // THROW, CONTINUE... [1]
 
-    Decay_If_Unstable(result);  // RAISED! fail()s, jumps to ON_ABRUPT_FAILURE
+    Decay_If_Unstable(result);  // RAISED! panic()s, jumps to ON_ABRUPT_PANIC
 
     CLEANUP_BEFORE_EXITING_RESCUE_SCOPE;
     goto finished_rebol_call;
 
-} ON_ABRUPT_FAILURE(error) {  ////////////////////////////////////////////////
+} ON_ABRUPT_PANIC(error) {  //////////////////////////////////////////////////
 
-    panic (error);  // can't give meaningful return value on fail() [1]
+    crash (error);  // can't give meaningful return value on panic() [1]
 
 } finished_rebol_call: { /////////////////////////////////////////////////////
 
@@ -1170,7 +1169,7 @@ void callback_dispatcher(  // client C code calls this, not the trampoline
             param
         );
         if (e)
-            fail (unwrap e);
+            panic (unwrap e);
         UNUSED(offset);
     }
 }}
@@ -1436,16 +1435,16 @@ DECLARE_NATIVE(MAKE_ROUTINE)
     Element* spec = Element_ARG(FFI_SPEC);
 
     RebolValue* handle = rebEntrap("pick", ARG(LIB), ARG(NAME));
-    if (Is_Error(handle))  // PICK returned raised error, entrap made it plain
-        return FAIL(Cell_Error(handle));
+    if (Is_Warning(handle))  // PICK returned error, entrap made it plain
+        return PANIC(Cell_Error(handle));
 
-    Unquotify(Known_Element(handle));  // rebEntrap() is quoted for non-raised
+    Unquotify(Known_Element(handle));  // rebEntrap() is quoted for non-error
     assert(Is_Handle_Cfunc(handle));
 
     RoutineDetails* r;
     Option(Error*) e = Trap_Alloc_Ffi_Action_For_Spec(&r, spec, abi);
     if (e)
-        return FAIL(unwrap e);
+        return PANIC(unwrap e);
 
     Copy_Cell(Routine_At(r, IDX_ROUTINE_CFUNC), handle);
     rebRelease(handle);
@@ -1486,12 +1485,12 @@ DECLARE_NATIVE(MAKE_ROUTINE_RAW)
         cast(uintptr_t, VAL_INT64(ARG(POINTER))
     ));
     if (cfunc == nullptr)
-        return FAIL("FFI: nullptr pointer not allowed for raw MAKE-ROUTINE");
+        return PANIC("FFI: nullptr pointer not allowed for raw MAKE-ROUTINE");
 
     RoutineDetails* r;
     Option(Error*) e = Trap_Alloc_Ffi_Action_For_Spec(&r, spec, abi);
     if (e)
-        return FAIL(unwrap e);
+        return PANIC(unwrap e);
 
     Init_Handle_Cfunc(Routine_At(r, IDX_ROUTINE_CFUNC), cfunc);
     Init_Space(Routine_At(r, IDX_ROUTINE_CLOSURE));
@@ -1530,7 +1529,7 @@ DECLARE_NATIVE(WRAP_CALLBACK)
     RoutineDetails* r;
     Option(Error*) e = Trap_Alloc_Ffi_Action_For_Spec(&r, spec, abi);
     if (e)
-        return FAIL(unwrap e);
+        return PANIC(unwrap e);
 
     void *thunk;  // actually CFUNC (FFI uses void*, may not be same size!)
     ffi_closure *closure = cast(ffi_closure*, ffi_closure_alloc(
@@ -1538,7 +1537,7 @@ DECLARE_NATIVE(WRAP_CALLBACK)
     ));
 
     if (closure == nullptr)
-        return FAIL("FFI: Couldn't allocate closure");
+        return PANIC("FFI: Couldn't allocate closure");
 
     ffi_status status = ffi_prep_closure_loc(
         closure,
@@ -1549,11 +1548,11 @@ DECLARE_NATIVE(WRAP_CALLBACK)
     );
 
     if (status != FFI_OK)
-        return FAIL("FFI: Couldn't prep closure");
+        return PANIC("FFI: Couldn't prep closure");
 
     bool check = true;  // avoid "conditional expression is constant"
     if (check and sizeof(void*) != sizeof(CFunction*))
-        return FAIL("FFI requires void* size equal C function pointer size");
+        return PANIC("FFI requires void* size equal C function pointer size");
 
     CFunction* cfunc_thunk;  // FFI uses wrong type [1]
     memcpy(&cfunc_thunk, &thunk, sizeof(cfunc_thunk));

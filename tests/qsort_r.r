@@ -40,7 +40,7 @@ cb: make-callback:fallback [
     assert [tag? arg]
 
     comment [
-        fail "testing fallback behavior"
+        panic "testing fallback behavior"
     ]
 
     let ai: make struct! compose:deep [

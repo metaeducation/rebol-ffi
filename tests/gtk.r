@@ -30,19 +30,19 @@ recycle:torture
 libgtk: any [
     try make library! %libgtk-3.so
     try make library! %libgtk-3.so.0
-    fail "Couldn't find libgtk-3.so"
+    panic "Couldn't find libgtk-3.so"
 ]
 
 libglib: any [
     try make library! %libglib-2.0.so
     try make library! %libglib-2.0.so.0
-    fail "Couldn't find libglib-2.0.so"
+    panic "Couldn't find libglib-2.0.so"
 ]
 
 libgob: any [
     try make library! %libgobject-2.0.so
     try make library! %libgobject-2.0.so.0
-    fail "Couldn't find libgobject-2.0.so"
+    panic "Couldn't find libgobject-2.0.so"
 ]
 
 
