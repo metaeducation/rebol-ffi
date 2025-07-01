@@ -47,7 +47,7 @@ static void cleanup_ffi_type(void* p, size_t length) {
 //    depending on whether the data is owned by Rebol or not.  That series
 //    pointer is being referenced again by the child struct we give back.
 //
-static void Get_Scalar_In_Struct(
+static Result(Nothing) Get_Scalar_In_Struct(
     Sink(Value) out,  // if EXT_SYM_REBVAL, could be any value
     StructInstance* stu,
     StructField* field,
@@ -60,7 +60,7 @@ static void Get_Scalar_In_Struct(
 
     if (Field_Is_Struct(field)) {
         StructInstance* sub_stu = Alloc_Singular(
-            NODE_FLAG_MANAGED | STUB_FLAG_LINK_NODE_NEEDS_MARK
+            BASE_FLAG_MANAGED | STUB_FLAG_LINK_NEEDS_MARK
         );
         LINK_STRUCT_SCHEMA(sub_stu) = field;
 
@@ -68,7 +68,7 @@ static void Get_Scalar_In_Struct(
         STRUCT_OFFSET(sub_stu) = offset;
         assert(Struct_Total_Size(sub_stu) == Field_Width(field));
         Init_Struct(out, sub_stu);
-        return;
+        return nothing;
     }
 
     Byte* p = offset + Struct_Data_Head(stu);
@@ -126,6 +126,8 @@ static void Get_Scalar_In_Struct(
         assert(false);
         panic ("Unknown FFI type indicator");
     }
+
+    return nothing;
 }
 
 
@@ -137,7 +139,7 @@ static void Get_Scalar_In_Struct(
 // Cannot panic(), because panic() could call MOLD on a struct!, which will end
 // up infinitive recursive calls.
 //
-Source* Struct_To_Array(StructInstance* stu)
+Result(Source*) Struct_To_Array(StructInstance* stu)
 {
     Array* fieldlist = Struct_Fields_Array(stu);
     Element* fields_item = Array_Head(fieldlist);
@@ -159,14 +161,12 @@ Source* Struct_To_Array(StructInstance* stu)
             Init_Word(Alloc_Tail_Array(typespec), EXT_CANON(STRUCT_X));
 
             DECLARE_VALUE (nested);
-            Get_Scalar_In_Struct(nested, stu, field, 0);
+            required (Get_Scalar_In_Struct(nested, stu, field, 0));
             assert(Is_Struct(nested));
 
             Push_Lifeguard(nested); // is this guard still necessary?
-            Init_Block(
-                Alloc_Tail_Array(typespec),
-                Struct_To_Array(Cell_Struct(nested))
-            );
+            Source* array = require (Struct_To_Array(Cell_Struct(nested)));
+            Init_Block(Alloc_Tail_Array(typespec), array);
             Drop_Lifeguard(nested);
         }
         else {
@@ -186,7 +186,7 @@ Source* Struct_To_Array(StructInstance* stu)
             //
             REBLEN dimension = Field_Dimension(field);
             Source* one_int = Alloc_Singular(
-                FLAG_FLAVOR(SOURCE) | NODE_FLAG_MANAGED
+                FLAG_FLAVOR(FLAVOR_SOURCE) | BASE_FLAG_MANAGED
             );
             Init_Integer(Stub_Cell(one_int), dimension);
             Init_Block(Alloc_Tail_Array(typespec), one_int);
@@ -199,7 +199,7 @@ Source* Struct_To_Array(StructInstance* stu)
             REBLEN n;
             for (n = 0; n < dimension; n ++) {
                 DECLARE_VALUE (scalar);
-                Get_Scalar_In_Struct(scalar, stu, field, n);
+                required (Get_Scalar_In_Struct(scalar, stu, field, n));
                 if (Is_Antiform(scalar))
                     panic ("Can't put antiform in block for Struct_To_Array()");
                 Copy_Cell(Array_At(init, n), cast(Element*, scalar));
@@ -208,7 +208,7 @@ Source* Struct_To_Array(StructInstance* stu)
         }
         else {
             DECLARE_VALUE (scalar);
-            Get_Scalar_In_Struct(scalar, stu, field, 0);
+            required (Get_Scalar_In_Struct(scalar, stu, field, 0));
             if (Is_Antiform(scalar))
                 panic ("Can't put antiform in block for Struct_To_Array()");
             Copy_Cell(Alloc_Tail_Array(typespec), Known_Element(scalar));
@@ -233,7 +233,7 @@ IMPLEMENT_GENERIC(MOLDIFY, Is_Struct)
 
     Begin_Non_Lexical_Mold(mo, cell);
 
-    Array* array = Struct_To_Array(Cell_Struct(cell));
+    Array* array = require (Struct_To_Array(Cell_Struct(cell)));
     Mold_Array_At(mo, array, 0, "[]");
     Free_Unmanaged_Flex(array);
 
@@ -287,12 +287,13 @@ static bool Same_Fields(const Array* a_fieldlist, const Array* b_fieldlist)
     }
 
     assert(b_item == b_tail);
+    UNUSED(b_tail);
 
     return true;
 }
 
 
-static Option(Error*) Trap_Set_Scalar_In_Struct_core(
+static Result(Nothing) Set_Scalar_In_Struct_core(
     Byte* data_head,
     REBLEN offset,
     StructField* field,
@@ -306,21 +307,21 @@ static Option(Error*) Trap_Set_Scalar_In_Struct_core(
 
     if (Field_Is_Struct(field)) {
         if (not Is_Struct(val))
-            return Error_Invalid_Type_Raw(Datatype_Of(val));
+            panic (Error_Invalid_Type_Raw(Datatype_Of(val)));
 
         if (Field_Width(field) != Cell_Struct_Total_Size(val))
-            return Error_Bad_Value(val);
+            panic (Error_Bad_Value(val));
 
         if (not Same_Fields(
             Field_Subfields_Array(field),
             Cell_Struct_Fields_Array(val)
         )){
-            return Error_Bad_Value(val);
+            panic (Error_Bad_Value(val));
         }
 
         memcpy(data, Cell_Struct_Data_At(val), Field_Width(field));
 
-        return SUCCESS;
+        return nothing;
     }
 
     // All other types take numbers
@@ -346,7 +347,7 @@ static Option(Error*) Trap_Set_Scalar_In_Struct_core(
         // definitions, and the feature may be useful for function args.
 
         if (Field_Type_Id(field) != EXT_SYM_REBVAL)
-            return Error_Invalid_Type_Raw(Datatype_Of(val));
+            panic (Error_Invalid_Type_Raw(Datatype_Of(val)));
 
         // Avoid uninitialized variable warnings (should not be used)
         //
@@ -357,37 +358,37 @@ static Option(Error*) Trap_Set_Scalar_In_Struct_core(
     switch (Field_Type_Id(field)) {
       case EXT_SYM_INT8:
         if (i > 0x7f or i < -128)
-            return Error_Overflow_Raw();
+            panic (Error_Overflow_Raw());
         *cast(int8_t*, data) = cast(int8_t, i);
         break;
 
       case EXT_SYM_UINT8:
         if (i > 0xff or i < 0)
-            return Error_Overflow_Raw();
+            panic (Error_Overflow_Raw());
         *cast(uint8_t*, data) = cast(uint8_t, i);
         break;
 
       case EXT_SYM_INT16:
         if (i > 0x7fff or i < -0x8000)
-            return Error_Overflow_Raw();
+            panic (Error_Overflow_Raw());
         *cast(int16_t*, data) = cast(int16_t, i);
         break;
 
       case EXT_SYM_UINT16:
         if (i > 0xffff or i < 0)
-            return Error_Overflow_Raw();
+            panic (Error_Overflow_Raw());
         *cast(uint16_t*, data) = cast(uint16_t, i);
         break;
 
       case EXT_SYM_INT32:
         if (i > INT32_MAX or i < INT32_MIN)
-            return Error_Overflow_Raw();
+            panic (Error_Overflow_Raw());
         *cast(int32_t*, data) = cast(int32_t, i);
         break;
 
       case EXT_SYM_UINT32:
         if (i > UINT32_MAX or i < 0)
-            return Error_Overflow_Raw();
+            panic (Error_Overflow_Raw());
         *cast(uint32_t*, data) = cast(uint32_t, i);
         break;
 
@@ -397,7 +398,7 @@ static Option(Error*) Trap_Set_Scalar_In_Struct_core(
 
       case EXT_SYM_UINT64:
         if (i < 0)
-            return Error_Overflow_Raw();
+            panic (Error_Overflow_Raw());
         *cast(uint64_t*, data) = cast(uint64_t, i);
         break;
 
@@ -412,7 +413,7 @@ static Option(Error*) Trap_Set_Scalar_In_Struct_core(
       case EXT_SYM_POINTER: {
         size_t sizeof_void_ptr = sizeof(void*); // avoid constant conditional
         if (sizeof_void_ptr == 4 and i > UINT32_MAX)
-            return Error_Overflow_Raw();
+            panic (Error_Overflow_Raw());
         *cast(void**, data) = p_cast(void*, cast(intptr_t, i));
         break; }
 
@@ -431,80 +432,80 @@ static Option(Error*) Trap_Set_Scalar_In_Struct_core(
         panic ("unknown Field_Type_Id()");
     }
 
-    return SUCCESS;
+    return nothing;
 }
 
 
-INLINE Option(Error*) Trap_Set_Scalar_In_Struct(
+INLINE Result(Nothing) Set_Scalar_In_Struct(
     StructInstance* stu,
     StructField* field,
     REBLEN n,
     const Value* val
 ){
-    return Trap_Set_Scalar_In_Struct_core(
+    return Set_Scalar_In_Struct_core(
         Struct_Data_Head(stu), STRUCT_OFFSET(stu), field, n, val
     );
 }
 
 
-static Option(Error*) Trap_Parse_Struct_Attribute(
+static Result(Nothing) Parse_Struct_Attribute(
     const Element* block,
     REBINT *raw_size,
     uintptr_t *raw_addr
 ){
     const Element* tail;
-    const Element* attr = Cell_List_At(&tail, block);
+    const Element* attr = List_At(&tail, block);
 
     *raw_size = -1;
     *raw_addr = 0;
 
     while (attr != tail) {
         if (not Is_Set_Word(attr))
-            return Error_Bad_Value(attr);
+            panic (attr);
 
-        switch (Cell_Word_Id(attr)) {
+        switch (Word_Id(attr)) {
           case EXT_SYM_RAW_SIZE:
             ++attr;
             if (attr == tail or not Is_Integer(attr))
-                return Error_Bad_Value(attr);
+                panic (attr);
             if (*raw_size > 0)
-                return Error_User("FFI: duplicate raw size");
+                panic ("FFI: duplicate raw size");
             *raw_size = VAL_INT64(attr);
             if (*raw_size <= 0)
-                return Error_User("FFI: raw size cannot be zero");
+                panic ("FFI: raw size cannot be zero");
             break;
 
           case EXT_SYM_RAW_MEMORY:
             ++attr;
             if (attr == tail or not Is_Integer(attr))
-                return Error_Bad_Value(attr);
+                panic (attr);
             if (*raw_addr != 0)
-                return Error_User("FFI: duplicate raw memory");
+                panic ("FFI: duplicate raw memory");
             *raw_addr = cast(REBU64, VAL_INT64(attr));
             if (*raw_addr == 0)
-                return Error_User("FFI: void pointer illegal for raw memory");
+                panic ("FFI: void pointer illegal for raw memory");
             break;
 
           case EXT_SYM_EXTERN: {
             ++attr;
 
             if (*raw_addr != 0)
-                return Error_User("FFI: raw memory is exclusive with extern");
+                panic ("FFI: raw memory is exclusive with extern");
 
-            if (attr == tail or not Is_Block(attr) or Cell_Series_Len_At(attr) != 2)
-                return Error_Bad_Value(attr);
+            if (attr == tail or not Is_Block(attr) or Series_Len_At(attr) != 2)
+                panic (attr);
 
-            const Element* lib = Cell_List_Item_At(attr);
+            const Element* lib = List_Item_At(attr);
             if (rebNot("library! = type of", lib))
-                return Error_Bad_Value(attr);
+                panic (attr);
 
-            const Element* linkname = Cell_List_Item_At(attr) + 1;
+            const Element* linkname = List_Item_At(attr) + 1;
             if (not Any_String(linkname))
-                return Error_Bad_Value(linkname);
+                panic (linkname);
 
             RebolValue* result = rebEntrap("pick", lib, linkname);
             if (Is_Warning(result))
-                return Cell_Error(result);
+                panic (Cell_Error(result));
 
             Unquotify(Known_Element(result));
             assert(Is_Handle(result));
@@ -524,13 +525,13 @@ static Option(Error*) Trap_Parse_Struct_Attribute(
         */
 
           default:
-            return Error_Bad_Value(attr);
+            panic (attr);
         }
 
         ++attr;
     }
 
-    return SUCCESS;
+    return nothing;
 }
 
 
@@ -553,7 +554,7 @@ static void cleanup_noop(void* p, size_t length) {
 // external pointer.  This uses a managed HANDLE! for the same purpose, as
 // a less invasive way of doing the same thing.
 //
-static Option(Error*) Trap_Set_Struct_Storage_External(
+static Result(Nothing) Set_Struct_Storage_External(
     StructInstance* stu,
     REBLEN len,
     REBINT raw_size,
@@ -562,7 +563,7 @@ static Option(Error*) Trap_Set_Struct_Storage_External(
     if (raw_size >= 0 and raw_size != cast(REBINT, len)) {
         DECLARE_ELEMENT (i);
         Init_Integer(i, raw_size);
-        return Error_Invalid_Data_Raw(i);
+        panic (Error_Invalid_Data_Raw(i));
     }
 
     Init_Handle_Cdata_Managed(
@@ -572,7 +573,7 @@ static Option(Error*) Trap_Set_Struct_Storage_External(
         &cleanup_noop
     );
 
-    return SUCCESS;
+    return nothing;
 }
 
 
@@ -685,19 +686,19 @@ static void Prepare_Field_For_Ffi(StructField* schema)
 // will actually be creating a new `inner` STRUCT! value.  Since this value
 // is managed and not referred to elsewhere, there can't be evaluations.
 //
-static Option(Error*) Trap_Parse_Field_Type_May_Panic(
+static Result(Nothing) Parse_Field_Type(
     StructField* field,
     const Element* spec,
     Sink(Element) inner  // will be set only if STRUCT!
 ){
     const Element* tail;
-    const Element* val = Cell_List_At(&tail, spec);
+    const Element* val = List_At(&tail, spec);
 
     if (val == tail)
-        return Error_User("Empty field type in FFI");
+        panic ("Empty field type in FFI");
 
     if (Is_Word(val)) {
-        Option(SymId) id = Cell_Word_Id(val);
+        Option(SymId) id = Word_Id(val);
 
         // Use WORD! as the field type by default (will be overwritten in the
         // EXT_SYM_STRUCT_X cases, type not a simple word if field is struct).
@@ -766,14 +767,11 @@ static Option(Error*) Trap_Parse_Field_Type_May_Panic(
                 panic (Error_Unexpected_Type(TYPE_BLOCK, Datatype_Of(val)));
 
             DECLARE_ELEMENT (specific);
-            Derelativize(specific, val, Cell_List_Binding(spec));
+            Derelativize(specific, val, List_Binding(spec));
 
             Push_Lifeguard(specific);
-            Option(Error*) e = Trap_Make_Struct(inner, specific);
-            Drop_Lifeguard(specific);
-
-            if (e)
-                return e;
+            required (Make_Struct(inner, specific));
+            Drop_Lifeguard(specific);  // panic should handle lifguards
 
             Init_Integer(
                 Field_Detail(field, IDX_FIELD_WIDE),
@@ -838,10 +836,10 @@ static Option(Error*) Trap_Parse_Field_Type_May_Panic(
             Field_Detail(field, IDX_FIELD_FFTYPE),
             Field_Detail(Cell_Struct_Schema(val), IDX_FIELD_FFTYPE)
         );
-        Derelativize(inner, val, Cell_List_Binding(spec));
+        Derelativize(inner, val, List_Binding(spec));
     }
     else
-        return Error_Invalid_Type_Raw(Datatype_Of(val));
+        panic (Error_Invalid_Type_Raw(Datatype_Of(val)));
 
     ++val;
 
@@ -855,32 +853,32 @@ static Option(Error*) Trap_Parse_Field_Type_May_Panic(
         // make struct! [a: [int32 [2]] [0 0]]
         //
         DECLARE_ELEMENT (ret);
-        Context* derived = Derive_Binding(Cell_List_Binding(spec), val);
+        Context* derived = Derive_Binding(List_Binding(spec), val);
         if (Eval_Any_List_At_Throws(ret, val, derived))
-            return Error_No_Catch_For_Throw(TOP_LEVEL);
+            panic (Error_No_Catch_For_Throw(TOP_LEVEL));
 
         if (not Is_Integer(ret))
-            return Error_Unexpected_Type(TYPE_INTEGER, Datatype_Of(val));
+            panic (Error_Unexpected_Type(TYPE_INTEGER, Datatype_Of(val)));
 
         Init_Integer(Field_Detail(field, IDX_FIELD_DIMENSION), VAL_INT64(ret));
         ++val;
     }
     else
-        return Error_Invalid_Type_Raw(Datatype_Of(val));
+        panic (Error_Invalid_Type_Raw(Datatype_Of(val)));
 
-    return SUCCESS;
+    return nothing;
 }
 
 
 // a: make struct! [uint 8 i: 1]
 // b: make a [i: 10]
 //
-Option(Error*) Trap_Init_Struct_Fields(
+Result(Nothing) Init_Struct_Fields(
     Sink(Element) ret,
     const Element* spec
 ){
     const Element* spec_tail;
-    const Element* spec_item = Cell_List_At(&spec_tail, spec);
+    const Element* spec_item = List_At(&spec_tail, spec);
 
     while (spec_item != spec_tail) {
         const Element* word;
@@ -889,35 +887,31 @@ Option(Error*) Trap_Init_Struct_Fields(
             uintptr_t raw_addr = 0;
 
             // make sure no other field initialization
-            if (Cell_Series_Len_Head(spec) != 1)
-                return Error_Bad_Value(spec);
+            if (Series_Len_Head(spec) != 1)
+                panic (spec);
 
-            Option(Error*) e1 = Trap_Parse_Struct_Attribute(
+            required (Parse_Struct_Attribute(
                 spec_item, &raw_size, &raw_addr
-            );
-            if (e1)
-                return e1;
+            ));
 
-            Option(Error*) e2 = Trap_Set_Struct_Storage_External(
+            required (Set_Struct_Storage_External(
                 Cell_Struct(ret),
                 Cell_Struct_Total_Size(ret),
                 raw_size,
                 raw_addr
-            );
-            if (e2)
-                return e2;
+            ));
 
             break;
         }
         else {
             word = spec_item;
             if (not Is_Set_Word(word))
-                return Error_Bad_Value(word);
+                panic (word);
         }
 
         const Element* fld_val = spec_item + 1;
         if (fld_val == spec_tail)
-            return Error_Need_Non_End_Raw(fld_val);
+            panic (Error_Need_Non_End_Raw(fld_val));
 
         Array* fieldlist = Cell_Struct_Fields_Array(ret);
         Element* field_item = Array_Head(fieldlist);
@@ -926,24 +920,22 @@ Option(Error*) Trap_Init_Struct_Fields(
         for (; field_item != fields_tail; ++field_item) {
             StructField* field = Cell_Array_Known_Mutable(field_item);
 
-            if (Field_Name(field) != Cell_Word_Symbol(word))
+            if (Field_Name(field) != Word_Symbol(word))
                 continue;
 
             if (Field_Is_C_Array(field)) {
                 if (Is_Block(fld_val)) {
                     REBLEN dimension = Field_Dimension(field);
 
-                    if (Cell_Series_Len_At(fld_val) != dimension)
-                        return Error_Bad_Value(fld_val);
+                    if (Series_Len_At(fld_val) != dimension)
+                        panic (fld_val);
 
                     REBLEN n = 0;
-                    const Element* at = Cell_List_Item_At(fld_val);
+                    const Element* at = List_Item_At(fld_val);
                     for (n = 0; n < dimension; ++n, ++at) {
-                        Option(Error*) e = Trap_Set_Scalar_In_Struct(
+                        required (Set_Scalar_In_Struct(
                             Cell_Struct(ret), field, n, at
-                        );
-                        if (e)
-                            return Error_Bad_Value(fld_val);
+                        ));
                     }
                 }
                 else if (Is_Integer(fld_val)) { // interpret as a data pointer
@@ -959,34 +951,32 @@ Option(Error*) Trap_Init_Struct_Fields(
                     );
                 }
                 else
-                    return Error_Bad_Value(fld_val);
+                    panic (fld_val);
             }
             else {
-                Option(Error*) e = Trap_Set_Scalar_In_Struct(
+                required (Set_Scalar_In_Struct(
                     Cell_Struct(ret),
                     field,
                     0,
                     fld_val
-                );
-                if (e)
-                    return e;
+                ));
             }
             goto next_spec_pair;
         }
 
-        return Error_User("FFI: field not in the parent struct");
+        panic ("FFI: field not in the parent struct");
 
       next_spec_pair:
 
         spec_item += 2;
     }
 
-    return SUCCESS;
+    return nothing;
 }
 
 
 //
-//  Trap_Make_Struct: C
+//  Make_Struct: C
 //
 // Field definitions look like:
 //
@@ -1001,10 +991,10 @@ Option(Error*) Trap_Init_Struct_Fields(
 // (!!! field3 and field4 are set-words above, but do not seem to have
 // initialization.  Is that right?)
 //
-Option(Error*) Trap_Make_Struct(Sink(Element) out, const Element* arg)
+Result(Element*) Make_Struct(Sink(Element) out, const Element* arg)
 {
-    if (Cell_Series_Len_At(arg) == 0)
-        return Error_User("Empty Struct Definitions not legal");
+    if (Series_Len_At(arg) == 0)
+        panic ("Empty Struct Definitions not legal");
 
     Level* L = Make_Level_At(&Stepper_Executor, arg, LEVEL_MASK_NONE);
     const Element* at = At_Level(L);
@@ -1063,13 +1053,11 @@ Option(Error*) Trap_Make_Struct(Sink(Element) out, const Element* arg)
 
     if (Is_Block(at)) {  // leading block? [1]
         DECLARE_ELEMENT (specific);
-        Derelativize(specific, at, Cell_List_Binding(arg));
+        Derelativize(specific, at, List_Binding(arg));
 
-        Option(Error*) e = Trap_Parse_Struct_Attribute(
+        required (Parse_Struct_Attribute(
             specific, &raw_size, &raw_addr
-        );
-        if (e)
-            return e;
+        ));
 
         Fetch_Next_In_Feed(L->feed);
         at = At_Level(L);
@@ -1124,58 +1112,56 @@ Option(Error*) Trap_Make_Struct(Sink(Element) out, const Element* arg)
     if (Is_Set_Word(at)) {  // Set-words initialize
         expect_init = true;
         if (raw_addr)  // initialize not allowed for raw memory struct
-            return Error_Bad_Value(at);
+            panic (at);
     }
     else if (Is_Word(at))  // Words don't initialize
         expect_init = false;
     else
-        return Error_Bad_Value(at);
+        panic (at);
 
-    Init_Word(Field_Detail(field, IDX_FIELD_NAME), Cell_Word_Symbol(at));
+    Init_Word(Field_Detail(field, IDX_FIELD_NAME), Word_Symbol(at));
 
     Fetch_Next_In_Feed(L->feed);
     if (Is_Level_At_End(L))
-        return Error_User("Invalid end of input");
+        panic ("Invalid end of input");
 
     at = At_Level(L);
 
     if (not Is_Block(at))
-        return Error_Bad_Value(at);
+        panic (at);
 
-    Derelativize(spec, at, Cell_List_Binding(arg));
+    Derelativize(spec, at, List_Binding(arg));
 
     // Fills in the width, dimension, type, and ffi_type (if needed)
     //
-    Option(Error*) e = Trap_Parse_Field_Type_May_Panic(field, spec, init);
-    if (e)
-        return unwrap e;
+    required (Parse_Field_Type(field, spec, init));
 
     REBLEN dimension = Field_Is_C_Array(field) ? Field_Dimension(field) : 1;
 
     if (Field_Width(field) > UINT32_MAX)
-        return Error_Size_Limit_Raw(maybe Field_Name(field));
+        panic (Error_Size_Limit_Raw(maybe Field_Name(field)));
 
     if (dimension > UINT32_MAX) {
         DECLARE_ELEMENT (dim);
         Init_Integer(dim, dimension);
-        return Error_Size_Limit_Raw(dim);
+        panic (Error_Size_Limit_Raw(dim));
     }
 
     uint64_t step =
         cast(uint64_t, Field_Width(field)) * cast(uint64_t, dimension);
 
     if (step > VAL_STRUCT_LIMIT)
-        return Error_Size_Limit_Raw(out);
+        panic (Error_Size_Limit_Raw(out));
 
     if (raw_addr == 0)
         Expand_Flex_Tail(data_bin, step);
 
     Fetch_Next_In_Feed(L->feed);
-    Corrupt_If_Debug(at);
+    Corrupt_If_Needful(at);
 
     if (expect_init) {
         if (Is_Level_At_End(L))
-            return Error_Bad_Value(arg);
+            panic (arg);
 
         at = At_Level(L);
 
@@ -1191,12 +1177,12 @@ Option(Error*) Trap_Make_Struct(Sink(Element) out, const Element* arg)
             rebRelease(reduced);
 
             Fetch_Next_In_Feed(L->feed);
-            Corrupt_If_Debug(at);
+            Corrupt_If_Needful(at);
         }
         else {
             Erase_Cell(init);
             if (Eval_Step_Throws(init, L))
-                return Error_No_Catch_For_Throw(TOP_LEVEL);
+                panic (Error_No_Catch_For_Throw(TOP_LEVEL));
         }
 
         if (Field_Is_C_Array(field)) {
@@ -1211,34 +1197,30 @@ Option(Error*) Trap_Make_Struct(Sink(Element) out, const Element* arg)
                 );
             }
             else if (Is_Block(init)) {
-                if (Cell_Series_Len_At(init) != Field_Dimension(field))
-                    return Error_Bad_Value(init);
+                if (Series_Len_At(init) != Field_Dimension(field))
+                    panic (Error_Bad_Value(init));
 
-                const Element* at = Cell_List_Item_At(init);
+                const Element* at = List_Item_At(init);
 
                 for (Offset n = 0; n < Field_Dimension(field); ++n, ++at) {
-                    Option(Error*) e = Trap_Set_Scalar_In_Struct_core(
+                    required (Set_Scalar_In_Struct_core(
                         Binary_Head(data_bin),
                         offset,
                         field,
                         n,
                         at
-                    );
-                    if (e)
-                        return e;
+                    ));
                 }
             }
             else
-                return Error_Unexpected_Type(
+                panic (Error_Unexpected_Type(
                     TYPE_BLOCK, Datatype_Of(At_Level(L))
-                );
+                ));
         }
         else {  // scalar
-            Option(Error*) e = Trap_Set_Scalar_In_Struct_core(
+            required (Set_Scalar_In_Struct_core(
                 Binary_Head(data_bin), offset, field, 0, init
-            );
-            if (e)
-                return e;
+            ));
         }
     }
     else if (raw_addr == 0) {
@@ -1275,9 +1257,10 @@ Option(Error*) Trap_Make_Struct(Sink(Element) out, const Element* arg)
     //  offset = ((offset + alignment - 1) / alignment) * alignment;
 
     if (offset > VAL_STRUCT_LIMIT)
-        return Error_Size_Limit_Raw(out);
+        panic (Error_Size_Limit_Raw(out));
 
     ++field_idx;
+    UNUSED(field_idx);
 
     Init_Block(PUSH(), field);
 
@@ -1300,14 +1283,12 @@ Option(Error*) Trap_Make_Struct(Sink(Element) out, const Element* arg)
     LINK_STRUCT_SCHEMA(stu) = schema;
 
     if (raw_addr) {
-        Option(Error*) e = Trap_Set_Struct_Storage_External(
+        required (Set_Struct_Storage_External(
             stu,
             Field_Total_Size(schema),
             raw_size,
             raw_addr
-        );
-        if (e)
-            return e;
+        ));
     }
     else {
         Term_Binary(data_bin);
@@ -1318,7 +1299,7 @@ Option(Error*) Trap_Make_Struct(Sink(Element) out, const Element* arg)
 
     Init_Struct(out, stu);
 
-    return SUCCESS;
+    return out;
 }}
 
 
@@ -1331,11 +1312,9 @@ IMPLEMENT_GENERIC(MAKE, Is_Struct)
     Element* arg = Element_ARG(DEF);
 
     if (not Is_Block(arg))
-        return PANIC(PARAM(DEF));
+        panic (PARAM(DEF));
 
-    Option(Error*) e = Trap_Make_Struct(OUT, arg);
-    if (e)
-        return PANIC(unwrap e);
+    required (Make_Struct(OUT, arg));
 
     return OUT;
 }
@@ -1349,7 +1328,7 @@ IMPLEMENT_GENERIC(TWEAK_P, Is_Struct)
     Value* picker = ARG(PICKER);
 
     if (not Is_Word(picker))
-        return PANIC(PARAM(PICKER));
+        panic (PARAM(PICKER));
 
     StructInstance* stu = Cell_Struct(location);
 
@@ -1363,7 +1342,7 @@ IMPLEMENT_GENERIC(TWEAK_P, Is_Struct)
         if (Is_Dual_Nulled_Pick_Signal(dual))
             goto handle_pick;
 
-        return PANIC(Error_Bad_Poke_Dual_Raw(dual));
+        panic (Error_Bad_Poke_Dual_Raw(dual));
     }
 
     goto handle_poke;
@@ -1383,11 +1362,11 @@ IMPLEMENT_GENERIC(TWEAK_P, Is_Struct)
     for (; fields_item != fields_tail; ++fields_item) {
         StructField* field = Cell_Array_Known_Mutable(fields_item);
         Option(const Symbol*) field_name = Field_Name(field);
-        if (field_name != Cell_Word_Symbol(picker))  // C is case-sensitive
+        if (field_name != Word_Symbol(picker))  // C is case-sensitive
             continue;
 
         if (not Field_Is_C_Array(field)) {
-            Get_Scalar_In_Struct(OUT, stu, field, 0);  // index 0
+            required (Get_Scalar_In_Struct(OUT, stu, field, 0));  // index 0
             return DUAL_LIFTED(OUT);
         }
 
@@ -1397,9 +1376,9 @@ IMPLEMENT_GENERIC(TWEAK_P, Is_Struct)
         REBLEN n;
         for (n = 0; n < dimension; ++n) {
             DECLARE_VALUE (scalar);
-            Get_Scalar_In_Struct(scalar, stu, field, n);
+            required (Get_Scalar_In_Struct(scalar, stu, field, n));
             if (Is_Antiform(scalar))
-                return PANIC("Antiforms can't be put in block for PICK");
+                panic ("Antiforms can't be put in block for PICK");
             Copy_Cell(Array_At(arr, n), Known_Element(scalar));
         }
 
@@ -1413,32 +1392,30 @@ IMPLEMENT_GENERIC(TWEAK_P, Is_Struct)
     Unliftify_Known_Stable(dual);
 
     if (Is_Antiform(dual))
-        return PANIC(Error_Bad_Antiform(dual));
+        panic (Error_Bad_Antiform(dual));
 
     Element* poke = Known_Element(dual);
 
     for (; fields_item != fields_tail; ++fields_item) {
         StructField* field = Cell_Array_Known_Mutable(fields_item);
 
-        if (Cell_Word_Symbol(picker) != Field_Name(field))
+        if (Word_Symbol(picker) != Field_Name(field))
             continue;
 
         if (not Field_Is_C_Array(field)) {
-            Option(Error*) e = Trap_Set_Scalar_In_Struct(stu, field, 0, poke);
-            if (e)
-                return PANIC(unwrap e);
+            required (Set_Scalar_In_Struct(stu, field, 0, poke));
             return NO_WRITEBACK_NEEDED;
         }
 
         if (Is_Blob(poke)) {
             if (Field_Width(field) != 1)
-                return PANIC(
+                panic (
                     "Setting array field to BLOB! requires element width of 1"
                 );
             Size size;
-            const Byte* bytes = Cell_Blob_Size_At(&size, poke);
+            const Byte* bytes = Blob_Size_At(&size, poke);
             if (Field_Dimension(field) != size)
-                return PANIC(
+                panic (
                     "Setting field to BLOB! requires equal size (for now)"
                 );
 
@@ -1452,18 +1429,16 @@ IMPLEMENT_GENERIC(TWEAK_P, Is_Struct)
         }
 
         if (not Is_Block(poke))
-            return PANIC("Setting array field in STRUCT! requires BLOCK! atm");
+            panic ("Setting array field in STRUCT! requires BLOCK! atm");
 
         REBLEN dimension = Field_Dimension(field);
-        if (dimension != Cell_Series_Len_At(poke))
-            return PANIC("Dimension mismatch of array field");
+        if (dimension != Series_Len_At(poke))
+            panic ("Dimension mismatch of array field");
 
-        const Element* at = Cell_List_Item_At(poke);
+        const Element* at = List_Item_At(poke);
         REBLEN n = 0;
         for(n = 0; n < dimension; ++n, ++at) {
-            Option(Error*) e = Trap_Set_Scalar_In_Struct(stu, field, n, at);
-            if (e)
-                return PANIC(unwrap e);
+            required (Set_Scalar_In_Struct(stu, field, n, at));
         }
     }
 
@@ -1480,7 +1455,7 @@ IMPLEMENT_GENERIC(EQUAL_Q, Is_Struct)
     UNUSED(Bool_ARG(RELAX));
 
     if (Cell_Struct_Fields_Array(a) != Cell_Struct_Fields_Array(b))
-        return Init_Logic(OUT, false);
+        return LOGIC(false);
 
     assert(Cell_Struct_Total_Size(a) == Cell_Struct_Total_Size(b));
     assert(Same_Fields(Cell_Struct_Fields_Array(a), Cell_Struct_Fields_Array(b)));
@@ -1529,10 +1504,10 @@ IMPLEMENT_GENERIC(OLDGENERIC, Is_Struct)
       case SYM_CHANGE: {
         Value* arg = ARG_N(2);
         if (not Is_Blob(arg))
-            return PANIC(Error_Unexpected_Type(TYPE_BLOB, Datatype_Of(arg)));
+            panic (Error_Unexpected_Type(TYPE_BLOB, Datatype_Of(arg)));
 
-        if (Cell_Series_Len_At(arg) != Cell_Struct_Data_Size(val))
-            return PANIC(arg);
+        if (Series_Len_At(arg) != Cell_Struct_Data_Size(val))
+            panic (arg);
 
         memcpy(
             Cell_Struct_Data_Head(val),
@@ -1546,7 +1521,7 @@ IMPLEMENT_GENERIC(OLDGENERIC, Is_Struct)
         break;
     }
 
-    return UNHANDLED;
+    panic (UNHANDLED);
 }
 
 
@@ -1591,7 +1566,7 @@ IMPLEMENT_GENERIC(ADDRESS_OF, Is_Struct)
 {
     INCLUDE_PARAMS_OF_ADDRESS_OF;
 
-    Value* v = ARG(ELEMENT);
+    Value* v = Element_ARG(ELEMENT);
 
     return Init_Integer(OUT, i_cast(intptr_t, Cell_Struct_Data_At(v)));
 }
@@ -1632,9 +1607,7 @@ DECLARE_NATIVE(MAKE_SIMILAR_STRUCT)
 
     Init_Struct(OUT, Copy_Struct_Managed(Cell_Struct(spec)));
 
-    Option(Error*) e = Trap_Init_Struct_Fields(OUT, body);
-    if (e)
-        return PANIC(unwrap e);
+    required (Init_Struct_Fields(OUT, body));
 
     return OUT;
 }
@@ -1660,7 +1633,7 @@ DECLARE_NATIVE(DESTROY_STRUCT_STORAGE)
     INCLUDE_PARAMS_OF_DESTROY_STRUCT_STORAGE;
 
     if (Is_Blob(Struct_Storage(Cell_Struct(ARG(STRUCT)))))
-        return PANIC("Can't use external storage with DESTROY-STRUCT-STORAGE");
+        panic ("Can't use external storage with DESTROY-STRUCT-STORAGE");
 
     Element* handle = Struct_Storage(Cell_Struct(ARG(STRUCT)));
 
@@ -1668,7 +1641,7 @@ DECLARE_NATIVE(DESTROY_STRUCT_STORAGE)
     Init_Integer(pointer, i_cast(intptr_t, Cell_Handle_Pointer(void, handle)));
 
     if (Cell_Handle_Len(handle) == 0)
-        return PANIC("DESTROY-STRUCT-STORAGE given already destroyed handle");
+        panic ("DESTROY-STRUCT-STORAGE given already destroyed handle");
 
     CELL_HANDLE_LENGTH_U(handle) = 0;  // !!! assert correct for mem block size
 

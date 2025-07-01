@@ -134,7 +134,7 @@ INLINE Option(Element*) Routine_Return_Schema_Unless_Void(RoutineDetails* r) {
 }
 
 INLINE Count Routine_Num_Fixed_Args(RoutineDetails* r)
-  { return Cell_Series_Len_Head(Routine_At(r, IDX_ROUTINE_ARG_SCHEMAS)); }
+  { return Series_Len_Head(Routine_At(r, IDX_ROUTINE_ARG_SCHEMAS)); }
 
 INLINE Element* Routine_Arg_Schema(
     RoutineDetails* r,
@@ -191,7 +191,7 @@ extern bool Routine_Details_Querier(
 );
 
 INLINE bool Is_Action_Routine(const Value* v) {
-    Phase* phase = Cell_Frame_Phase(v);
+    Phase* phase = Frame_Phase(v);
 
     if (not Is_Stub_Details(phase))
         return false;  // !!! review cases where specializations could work

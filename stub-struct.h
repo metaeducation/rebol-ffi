@@ -171,7 +171,7 @@ enum {
 INLINE Option(const Symbol*) Field_Name(StructField* f) {
     if (Is_Space(Field_Detail(f, IDX_FIELD_NAME)))
         return nullptr;
-    return Cell_Word_Symbol(Field_Detail(f, IDX_FIELD_NAME));
+    return Word_Symbol(Field_Detail(f, IDX_FIELD_NAME));
 }
 
 INLINE bool Field_Is_Struct(StructField* f) {
@@ -188,11 +188,11 @@ INLINE bool Field_Is_Struct(StructField* f) {
 INLINE const Symbol* Field_Type_Symbol(StructField* f) {
     assert(not Field_Is_Struct(f));  // better than returning SYM_STRUCT_X [1]
     assert(Is_Word(Field_Detail(f, IDX_FIELD_TYPE)));
-    return Cell_Word_Symbol(Field_Detail(f, IDX_FIELD_TYPE));
+    return Word_Symbol(Field_Detail(f, IDX_FIELD_TYPE));
 }
 
 #define Field_Type_Id(f) \
-    (unwrap Cell_Word_Id(Field_Detail((f), IDX_FIELD_TYPE)))
+    (unwrap Word_Id(Field_Detail((f), IDX_FIELD_TYPE)))
 
 INLINE Source* Field_Subfields_Array(StructField* f) {
     assert(Field_Is_Struct(f));
@@ -231,7 +231,7 @@ INLINE ffi_type* Schema_Ffi_Type(const Element* schema) {
         StructField* field = Cell_Array_Known_Mutable(schema);
         return Field_Ffi_Type(field);
     }
-    return unwrap Get_Ffi_Type_For_Symbol(unwrap Cell_Word_Id(schema));
+    return unwrap Get_Ffi_Type_For_Symbol(unwrap Word_Id(schema));
 }
 
 
@@ -252,9 +252,9 @@ INLINE ffi_type* Schema_Ffi_Type(const Element* schema) {
 typedef Stub StructInstance;
 
 #define STUB_MASK_STRUCT ( \
-    FLAG_FLAVOR(CELLS) \
-        | NODE_FLAG_MANAGED \
-        | STUB_FLAG_LINK_NODE_NEEDS_MARK)
+    FLAG_FLAVOR(FLAVOR_CELLS) \
+        | BASE_FLAG_MANAGED \
+        | STUB_FLAG_LINK_NEEDS_MARK)
 
 #define LINK_STRUCT_SCHEMA(stu)     STUB_LINK(stu)  // StructField*
 #define MISC_STRUCT_OFFSET(stu)     (stu)->misc.u32
@@ -295,7 +295,7 @@ INLINE Byte* Struct_Data_Head(StructInstance* stu) {
 INLINE REBLEN Struct_Storage_Len(StructInstance* stu) {
     Element* data = Struct_Storage(stu);
     if (Is_Blob(data))
-        return Cell_Series_Len_At(data);
+        return Series_Len_At(data);
 
     assert(Cell_Handle_Len(data) != 0);  // is HANDLE!
     return Cell_Handle_Len(data);
@@ -310,7 +310,7 @@ INLINE REBLEN Struct_Storage_Len(StructInstance* stu) {
 
 INLINE StructInstance* Cell_Struct(const Cell* cell) {
     assert(Cell_Extra_Heart(cell) == EXTRA_HEART_STRUCT);
-    StructInstance* stu = cast(StructInstance*, CELL_NODE1(cell));
+    StructInstance* stu = cast(StructInstance*, CELL_PAYLOAD_1(cell));
 
     Element* data = Struct_Storage(stu);
     if (Is_Blob(data)) {
@@ -321,7 +321,7 @@ INLINE StructInstance* Cell_Struct(const Cell* cell) {
         if (Cell_Handle_Len(data) == 0) {  // inaccessible data
             DECLARE_ELEMENT (i);
             Init_Integer(i, i_cast(intptr_t, Struct_Data_Head(stu)));
-            panic (Error_Bad_Memory_Raw(i, i));  // !!! Can't pass stu?
+            abrupt_panic (Error_Bad_Memory_Raw(i, i));  // !!! Can't pass stu?
         }
     }
     return stu;
@@ -353,17 +353,17 @@ INLINE REBLEN Cell_Struct_Data_Size(const Cell* cell) {
     Struct_Ffi_Type(Cell_Struct(v))
 
 INLINE Element* Init_Struct(Init(Element) out, StructInstance* stu) {
-    assert(Is_Node_Managed(stu));
+    assert(Is_Base_Managed(stu));
     STRUCT_OFFSET(stu) = 0;  // !!! should this be done here?
 
     Reset_Extended_Cell_Header_Noquote(
         out,
         EXTRA_HEART_STRUCT,
-        (not CELL_FLAG_DONT_MARK_NODE1)  // array node needs mark
-            | CELL_FLAG_DONT_MARK_NODE2  // offset shouldn't be marked
+        (not CELL_FLAG_DONT_MARK_PAYLOAD_1)  // array node needs mark
+            | CELL_FLAG_DONT_MARK_PAYLOAD_2  // offset shouldn't be marked
     );
 
-    CELL_NODE1(out) = stu;
+    CELL_PAYLOAD_1(out) = stu;
 
     return out;
 }
@@ -379,4 +379,4 @@ INLINE Element* Init_Struct(Init(Element) out, StructInstance* stu) {
 // struct logic to create a structure that models their parameters.)
 //
 
-extern Option(Error*) Trap_Make_Struct(Sink(Element) out, const Element* arg);
+extern Result(Element*) Make_Struct(Sink(Element) out, const Element* arg);

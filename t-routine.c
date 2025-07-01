@@ -144,7 +144,7 @@ static ffi_abi Abi_From_Word_Or_Nulled(const Value* word) {
 // Writes into `schema_out` a Rebol value which describes either a basic FFI
 // type or the layout of a STRUCT! (not including data).
 //
-static Option(Error*) Trap_Make_Schema_From_Block(
+static Result(Nothing) Make_Schema_From_Block(
     Sink(Element) schema_out,  // => INTEGER! or HANDLE! for struct
     Option(Sink(Element)) param_out,  // => parameter for use in ACTION!s
     const Element* block,
@@ -153,31 +153,29 @@ static Option(Error*) Trap_Make_Schema_From_Block(
     UNUSED(symbol);  // not currently used
 
     assert(Is_Block(block));
-    if (Cell_Series_Len_At(block) == 0)
-        return Error_Bad_Value(block);
+    if (Series_Len_At(block) == 0)
+        panic (block);
 
     const Element* tail;
-    const Element* item = Cell_List_At(&tail, block);
+    const Element* item = List_At(&tail, block);
 
     DECLARE_ELEMENT (def);
     DECLARE_ELEMENT (temp);
 
-    if (Is_Word(item) and Cell_Word_Id(item) == EXT_SYM_STRUCT_X) {
+    if (Is_Word(item) and Word_Id(item) == EXT_SYM_STRUCT_X) {
         //
         // [struct! [...struct definition...]]
 
         ++item;
         if (item == tail or not Is_Block(item))
-            return Error_Bad_Value(block);
+            panic (block);
 
         // Use the block spec to build a temporary structure through the same
         // machinery that implements `make struct! [...]`
 
-        Derelativize(def, item, Cell_List_Binding(block));
+        Derelativize(def, item, List_Binding(block));
 
-        Option(Error*) e = Trap_Make_Struct(temp, def);
-        if (e)
-            return e;
+        required (Make_Struct(temp, def));
 
         assert(Is_Struct(temp));
 
@@ -194,7 +192,7 @@ static Option(Error*) Trap_Make_Schema_From_Block(
             );
             // TBD: constrain with STRUCT!
         }
-        return SUCCESS;
+        return nothing;
     }
 
     if (Is_Struct(item)) {
@@ -206,31 +204,31 @@ static Option(Error*) Trap_Make_Schema_From_Block(
             );
             // TBD: constrain with STRUCT!
         }
-        return SUCCESS;
+        return nothing;
     }
 
-    if (Cell_Series_Len_At(block) != 1)
-        return Error_Bad_Value(block);
+    if (Series_Len_At(block) != 1)
+        panic (block);
 
     // !!! It was presumed the only parameter convention that made sense was
     // a normal args, but quoted ones could work too.  In particular, anything
     // passed to the C as a REBVAL*.  Not a huge priority.
     //
     if (not Is_Word(item))
-        return Error_Bad_Value(block);
+        panic (block);
 
-    Option(SymId) id = Cell_Word_Id(item);
+    Option(SymId) id = Word_Id(item);
     if (id == SYM_VOID) {
         Init_Space(schema_out);
     }
     else
-        Init_Word(schema_out, Cell_Word_Symbol(item));
+        Init_Word(schema_out, Word_Symbol(item));
 
     if (param_out) {
         int index = 0;
         for (; ; ++index) {
-            if (syms_to_typesets[index].symid == TYPE_0)
-                return Error_User("Invalid FFI type indicator");
+            if (syms_to_typesets[index].symid == SYM_0)
+                panic ("Invalid FFI type indicator");
 
             if ((unwrap syms_to_typesets[index].symid) == id)
                 continue;
@@ -244,7 +242,7 @@ static Option(Error*) Trap_Make_Schema_From_Block(
         }
     }
 
-    return SUCCESS;
+    return nothing;
 }
 
 
@@ -286,8 +284,7 @@ INLINE static void* Expand_And_Align(
 // the FFI for how a C argument would be represented.  (e.g. turn an
 // INTEGER! into the appropriate representation of an `int` in memory.)
 //
-static Option(Error*) Trap_Cell_To_Ffi(
-    Sink(Offset) offset_out,
+static Result(Offset) Cell_To_Ffi(
     Binary* store,
     void *dest,
     const Value* arg,
@@ -302,10 +299,11 @@ static Option(Error*) Trap_Cell_To_Ffi(
     //
     assert(store == nullptr ? dest != nullptr : dest == nullptr);
 
+    Offset offset;
     if (dest == nullptr)
-        *offset_out = 0;
+        offset = 0;
     else
-        *offset_out = 10200304;  // shouldn't be used, but avoid warning
+        offset = 10200304;  // shouldn't be used, but avoid warning
 
     if (Is_Block(schema)) {
         StructField* top = Cell_Array_Known_Mutable(schema);
@@ -320,7 +318,7 @@ static Option(Error*) Trap_Cell_To_Ffi(
         //
         if (dest == nullptr)
             dest = Expand_And_Align_Core(
-                offset_out,
+                &offset,
                 sizeof(void*),
                 store,
                 Field_Width(top)  // !!! What about Field_Total_Size ?
@@ -331,7 +329,7 @@ static Option(Error*) Trap_Cell_To_Ffi(
             // Return values don't have an incoming argument to fill into the
             // calling frame.
             //
-            return SUCCESS;
+            return offset;
         }
 
         // !!! There wasn't any compatibility checking here before (not even
@@ -343,16 +341,16 @@ static Option(Error*) Trap_Cell_To_Ffi(
         // because it couldn't do so in the return case where arg was null)
 
         if (not Is_Struct(arg))
-            return Error_Arg_Type(label, key, param, arg);
+            panic (Error_Arg_Type(label, key, param, arg));
 
         Size size = Struct_Storage_Len(Cell_Struct(arg));
         if (size != Field_Width(top))
-            return Error_Arg_Type(label, key, param, arg);
+            panic (Error_Arg_Type(label, key, param, arg));
 
         memcpy(dest, Cell_Struct_Data_At(arg), size);
 
-        Term_Binary_Len(store, *offset_out + size);
-        return SUCCESS;
+        Term_Binary_Len(store, offset + size);
+        return offset;
     }
 
     assert(Is_Word(schema));
@@ -375,14 +373,14 @@ static Option(Error*) Trap_Cell_To_Ffi(
     char *data;
     Size size;
 
-    switch (Cell_Word_Id(schema)) {
+    switch (Word_Id(schema)) {
       case EXT_SYM_UINT8: {
         if (not arg)
             buffer.u8 = 0;  // return value, make space (but initialize)
         else if (Is_Integer(arg))
             buffer.u8 = cast(uint8_t, VAL_INT64(arg));
         else
-            return Error_Arg_Type(label, key, param, arg);
+            panic (Error_Arg_Type(label, key, param, arg));
 
         data = cast(char*, &buffer.u8);
         size = sizeof(buffer.u8);
@@ -394,7 +392,7 @@ static Option(Error*) Trap_Cell_To_Ffi(
         else if (Is_Integer(arg))
             buffer.i8 = cast(int8_t, VAL_INT64(arg));
         else
-            return Error_Arg_Type(label, key, param, arg);
+            panic (Error_Arg_Type(label, key, param, arg));
 
         data = cast(char*, &buffer.i8);
         size = sizeof(buffer.i8);
@@ -406,7 +404,7 @@ static Option(Error*) Trap_Cell_To_Ffi(
         else if (Is_Integer(arg))
             buffer.u16 = cast(uint16_t, VAL_INT64(arg));
         else
-            return Error_Arg_Type(label, key, param, arg);
+            panic (Error_Arg_Type(label, key, param, arg));
 
         data = cast(char*, &buffer.u16);
         size = sizeof(buffer.u16);
@@ -418,7 +416,7 @@ static Option(Error*) Trap_Cell_To_Ffi(
         else if (Is_Integer(arg))
             buffer.i16 = cast(int16_t, VAL_INT64(arg));
         else
-            return Error_Arg_Type(label, key, param, arg);
+            panic (Error_Arg_Type(label, key, param, arg));
 
         data = cast(char*, &buffer.i16);
         size = sizeof(buffer.i16);
@@ -430,7 +428,7 @@ static Option(Error*) Trap_Cell_To_Ffi(
         else if (Is_Integer(arg))
             buffer.u32 = cast(int32_t, VAL_INT64(arg));
         else
-            return Error_Arg_Type(label, key, param, arg);
+            panic (Error_Arg_Type(label, key, param, arg));
 
         data = cast(char*, &buffer.u32);
         size = sizeof(buffer.u32);
@@ -442,7 +440,7 @@ static Option(Error*) Trap_Cell_To_Ffi(
         else if (Is_Integer(arg))
             buffer.i32 = cast(int32_t, VAL_INT64(arg));
         else
-            return Error_Arg_Type(label, key, param, arg);
+            panic (Error_Arg_Type(label, key, param, arg));
 
         data = cast(char*, &buffer.i32);
         size = sizeof(buffer.i32);
@@ -455,7 +453,7 @@ static Option(Error*) Trap_Cell_To_Ffi(
         else if (Is_Integer(arg))
             buffer.i64 = VAL_INT64(arg);
         else
-            return Error_Arg_Type(label, key, param, arg);
+            panic (Error_Arg_Type(label, key, param, arg));
 
         data = cast(char*, &buffer.i64);
         size = sizeof(buffer.i64);
@@ -470,7 +468,7 @@ static Option(Error*) Trap_Cell_To_Ffi(
         }
         else if (Heart_Of_Is_0(arg)) {
             if (rebNot("vector! = type of @", arg))
-                return Error_User(
+                panic(
                     "VECTOR! is only extension type FFI accepts by pointer"
                 );
             buffer.ipt = cast(intptr_t, rebUnboxInteger("address-of", arg));
@@ -499,7 +497,7 @@ static Option(Error*) Trap_Cell_To_Ffi(
 
           case TYPE_ACTION: {
             if (not Is_Action_Routine(arg))
-                return Error_User(  // but routines, too?
+                panic (  // but routines, too?
                     "Only callback functions may be passed by FFI pointer"
                 );
 
@@ -512,7 +510,7 @@ static Option(Error*) Trap_Cell_To_Ffi(
             break; }
 
           default:
-            return Error_Arg_Type(label, key, param, arg);
+            panic (Error_Arg_Type(label, key, param, arg));
         }
 
         data = cast(char*, &buffer.ipt);
@@ -535,7 +533,7 @@ static Option(Error*) Trap_Cell_To_Ffi(
         else if (Is_Decimal(arg))
             buffer.f = cast(float, VAL_DECIMAL(arg));
         else
-            return Error_Arg_Type(label, key, param, arg);
+            panic (Error_Arg_Type(label, key, param, arg));
 
         data = cast(char*, &buffer.f);
         size = sizeof(buffer.f);
@@ -547,7 +545,7 @@ static Option(Error*) Trap_Cell_To_Ffi(
         else if (Is_Decimal(arg))
             buffer.d = VAL_DECIMAL(arg);
         else
-            return Error_Arg_Type(label, key, param, arg);
+            panic (Error_Arg_Type(label, key, param, arg));
 
         data = cast(char*, &buffer.d);
         size = sizeof(buffer.d);
@@ -558,7 +556,7 @@ static Option(Error*) Trap_Cell_To_Ffi(
         // structs should be processed above by the HANDLE! case, not WORD!
         //
         assert(false);
-        return Error_Bad_Value(arg);
+        panic (arg);
 
       case SYM_VOID:
         //
@@ -566,30 +564,30 @@ static Option(Error*) Trap_Cell_To_Ffi(
         // return types, so caller should check and not try to pass it in.
         //
         assert(false);
-        return Error_Bad_Value(arg);
+        panic (arg);
 
       default:
         assert(false);
-        return Error_Bad_Value(arg);
+        panic (arg);
     }
 
     if (store) {
         assert(dest == nullptr);
-        dest = Expand_And_Align(offset_out, store, size);
+        dest = Expand_And_Align(&offset, store, size);
     }
 
     memcpy(dest, data, size);
 
     if (store)
-        Term_Binary_Len(store, *offset_out + size);
+        Term_Binary_Len(store, offset + size);
 
-    return SUCCESS;
+    return offset;
 }
 
 
-// Convert a C value into a Rebol value.  Reverse of Trap_Cell_To_Ffi().
+// Convert a C value into a Rebol value.  Reverse of Cell_To_Ffi().
 //
-static void Ffi_To_Cell(
+static Result(Nothing) Ffi_To_Cell(
     Sink(Value) out,
     const Element* schema,
     void* ffi_rvalue
@@ -606,7 +604,7 @@ static void Ffi_To_Cell(
         STRUCT_OFFSET(stu) = 0;
 
         Binary* data = Make_Binary_Core(
-            NODE_FLAG_MANAGED,
+            BASE_FLAG_MANAGED,
             Field_Width(top)  // not Field_Is_C_Array, so no Field_Total_Size ?
         );
         memcpy(Binary_Head(data), ffi_rvalue, Field_Width(top));
@@ -615,20 +613,20 @@ static void Ffi_To_Cell(
         Reset_Extended_Cell_Header_Noquote(
             out,
             EXTRA_HEART_STRUCT,
-            (not CELL_FLAG_DONT_MARK_NODE1)  // StructInstance needs mark
-                | CELL_FLAG_DONT_MARK_NODE2  // Offset shouldn't be marked
+            (not CELL_FLAG_DONT_MARK_PAYLOAD_1)  // StructInstance needs mark
+                | CELL_FLAG_DONT_MARK_PAYLOAD_2  // Offset shouldn't be marked
         );
-        CELL_NODE1(out) = stu;
+        CELL_PAYLOAD_1(out) = stu;
 
         Init_Blob(Stub_Cell(stu), data);
 
         assert(Struct_Data_Head(stu) == Binary_Head(data));
-        return;
+        return nothing;
     }
 
     assert(Is_Word(schema));
 
-    switch (Cell_Word_Id(schema)) {
+    switch (Word_Id(schema)) {
       case EXT_SYM_UINT8:
         Init_Integer(out, *cast(uint8_t*, ffi_rvalue));
         break;
@@ -689,6 +687,8 @@ static void Ffi_To_Cell(
         //
         panic ("Unknown FFI type indicator");
     }
+
+    return nothing;
 }
 
 
@@ -710,7 +710,7 @@ Bounce Routine_Dispatcher(Level* const L)
     }
     else {
         if (rebNot("open?", unwrap Routine_Lib(r)))
-            return PANIC("Library closed in Routine_Dispatcher()");
+            panic ("Library closed in Routine_Dispatcher()");
     }
 
     Count num_fixed = Routine_Num_Fixed_Args(r);
@@ -747,8 +747,9 @@ Bounce Routine_Dispatcher(Level* const L)
 
     Phase* phase = Level_Phase(L);
     assert(Phase_Num_Params(phase) == num_fixed + 1);  // +1 for `...`
+    UNUSED(phase);
 
-    Value* vararg = Level_Arg(L, num_fixed + 1); // 1-based
+    Value* vararg = Known_Stable(Level_Arg(L, num_fixed + 1));  // 1-based
     assert(Is_Varargs(vararg));
 
     do {
@@ -768,7 +769,7 @@ Bounce Routine_Dispatcher(Level* const L)
     } while (true);
 
     if ((TOP_INDEX - base) % 2 != 0)  // must be paired [1]
-        return PANIC("Variadic FFI functions must alternate blocks and values");
+        panic ("Variadic FFI functions must alternate blocks and values");
 
     num_variable = (TOP_INDEX - base) / 2;
     num_args += num_variable;
@@ -794,12 +795,10 @@ Bounce Routine_Dispatcher(Level* const L)
     Option(Element*) ret_schema = Routine_Return_Schema_Unless_Void(r);
     void* ret_offset;
     if (ret_schema) {
-        Offset offset;
         const Symbol* ret_sym = CANON(RETURN);
         const Key* key = &ret_sym;  // return values, no name
         const Param* param = nullptr;
-        Option(Error*) e = Trap_Cell_To_Ffi(
-            &offset,
+        Offset offset = require (Cell_To_Ffi(
             store,  // ffi-converted arg appended here
             nullptr,  // dest pointer must be nullptr if store is non-nullptr
             nullptr,  // arg: none (only making space--leave uninitialized)
@@ -807,9 +806,7 @@ Bounce Routine_Dispatcher(Level* const L)
             Level_Label(L),
             key,
             param
-        );
-        if (e)
-            return PANIC(unwrap e);
+        ));
         ret_offset = p_cast(void*, offset);
     }
     else
@@ -819,7 +816,7 @@ Bounce Routine_Dispatcher(Level* const L)
     if (num_args == 0)
         arg_offsets = nullptr;  // don't waste time with the alloc + free
     else {
-        arg_offsets = Make_Flex(FLAG_FLAVOR(POINTERS), Flex, num_args);
+        arg_offsets = Make_Flex(FLAG_FLAVOR(FLAVOR_POINTERS), Flex, num_args);
         Set_Flex_Len(arg_offsets, num_args);
     }
 
@@ -839,12 +836,10 @@ Bounce Routine_Dispatcher(Level* const L)
     for (; i < num_fixed; ++i) {
         const Param* param = Phase_Param(Level_Phase(L), i + 1);  // 1-based
         const Key* key = Varlist_Key(Level_Varlist(L), i + 1);  // 1-based
-        const Value* arg = Level_Arg(L, i + 1);  // 1-based
+        const Value* arg = Known_Stable(Level_Arg(L, i + 1));  // 1-based
         const Element* schema = Routine_Arg_Schema(r, i);  // 0-based
 
-        Offset offset;
-        Option(Error*) e = Trap_Cell_To_Ffi(
-            &offset,
+        Offset offset = require (Cell_To_Ffi(
             store,  // ffi-converted arg appended here
             nullptr,  // dest pointer must be nullptr if store is non-null
             arg,
@@ -852,9 +847,7 @@ Bounce Routine_Dispatcher(Level* const L)
             label,
             key,
             param
-        );
-        if (e)
-            return PANIC(unwrap e);
+        ));
 
         *Flex_At(void*, arg_offsets, i) = p_cast(void*, offset);  // offset [1]
     }
@@ -900,21 +893,17 @@ Bounce Routine_Dispatcher(Level* const L)
 
         StackIndex dsp;
         for (dsp = base + 1; i < num_args; dsp += 2, ++i) {
-            Option(Error*) e1 = Trap_Make_Schema_From_Block(  // [3]
+            required (Make_Schema_From_Block(  // [3]
                 schema,
                 param, // sets type bits in param
                 Data_Stack_At(Element, dsp + 1), // errors if not a block
                 varargs_symbol  // symbol will appear in error reports
-            );
-            if (e1)
-                return PANIC(unwrap e1);
+            ));
 
             args_fftypes[i] = Schema_Ffi_Type(schema);
 
-            Offset offset;
             const Param* param = nullptr;
-            Option(Error*) e2 = Trap_Cell_To_Ffi(
-                &offset,
+            Offset offset = require (Cell_To_Ffi(
                 store,  // data appended to store
                 nullptr,  // dest pointer must be null if store is non-null
                 Data_Stack_At(Value, dsp),  // arg
@@ -922,9 +911,7 @@ Bounce Routine_Dispatcher(Level* const L)
                 Level_Label(L),
                 key,  // REVIEW: need key for error messages
                 param
-            );
-            if (e2)
-                return PANIC(unwrap e2);
+            ));
 
             *Flex_At(void*, arg_offsets, i) = p_cast(void*, offset);
         }
@@ -948,7 +935,7 @@ Bounce Routine_Dispatcher(Level* const L)
         if (status != FFI_OK) {
             rebFree(cif);  // would free automatically on panic
             rebFree(args_fftypes);  // would free automatically on panic
-            return PANIC(Error_User("FFI: Couldn't prep CIF_VAR"));
+            panic (Error_User("FFI: Couldn't prep CIF_VAR"));
         }
     }
 
@@ -1107,7 +1094,7 @@ void callback_dispatcher(  // client C code calls this, not the trampoline
     Source* arr = Make_Source(1 + cif->nargs);
     Element* elem = Array_Head(arr);
     Copy_Lifted_Cell(elem, Routine_Callback_Action(r));
-    LIFT_BYTE(elem) = NOQUOTE_1;
+    LIFT_BYTE(elem) = NOQUOTE_2;
     assert(Is_Frame(elem));
 
     ++elem;
@@ -1161,18 +1148,19 @@ void callback_dispatcher(  // client C code calls this, not the trampoline
         const Symbol* spelling = CANON(RETURN);
         const Param* param = nullptr;
         Offset offset;
-        Option(Error*) e = Trap_Cell_To_Ffi(
-            &offset,
-            nullptr,  // store must be null if dest is non-null,
-            ret,  // destination pointer
-            cast(Value*, result),
-            unwrap ret_schema,
-            label,
-            &spelling,  // parameter used for symbol in error only
-            param
-        );
-        if (e)
-            panic (unwrap e);
+        sys_util_rescue (
+            offset = Cell_To_Ffi(
+                nullptr,  // store must be null if dest is non-null,
+                ret,  // destination pointer
+                cast(Value*, result),
+                unwrap ret_schema,
+                label,
+                &spelling,  // parameter used for symbol in error only
+                param
+            )
+        ) (Error* e) {
+            abrupt_panic (e);
+        }
         UNUSED(offset);
     }
 }}
@@ -1203,8 +1191,7 @@ void callback_dispatcher(  // client C code calls this, not the trampoline
 //     return: [type] "note"
 // ]
 //
-Option(Error*) Trap_Alloc_Ffi_Action_For_Spec(
-    Sink(RoutineDetails*) out,
+Result(RoutineDetails*) Alloc_Ffi_Action_For_Spec(
     const Element* ffi_spec,
     ffi_abi abi
 ){
@@ -1239,38 +1226,36 @@ Option(Error*) Trap_Alloc_Ffi_Action_For_Spec(
     Push_Lifeguard(ret_schema_or_space);
 
     const Element* tail;
-    const Element* item = Cell_List_At(&tail, ffi_spec);
+    const Element* item = List_At(&tail, ffi_spec);
     for (; item != tail; ++item) {
         if (Is_Text(item))  // comment or argument description
             continue;  // !!! TBD: extract adjunct info from spec notes
 
         if (Is_Set_Word(item)) {  // TYPE_CHAIN, not TYPE_SET_WORD
-            if (Cell_Word_Id(item) != SYM_RETURN)
-                return Error_Bad_Value(item);
+            if (Word_Id(item) != SYM_RETURN)
+                panic (item);
 
             if (not Is_Space(ret_schema_or_space))
-                return Error_User("FFI: Return already specified");
+                panic ("FFI: Return already specified");
 
             ++item;
 
             DECLARE_ELEMENT (block);
-            Derelativize(block, item, Cell_List_Binding(ffi_spec));
+            Derelativize(block, item, List_Binding(ffi_spec));
 
-            Option(Error*) e = Trap_Make_Schema_From_Block(
+            required (Make_Schema_From_Block(
                 ret_schema_or_space,
                 nullptr,  // dummy (return/output has no arg to typecheck)
                 block,
                 CANON(RETURN)
-            );
-            if (e)
-                return e;
+            ));
         }
         else if (Is_Word(item)) {
-            const Symbol* name = Cell_Word_Symbol(item);
+            const Symbol* name = Word_Symbol(item);
 
             if (Are_Synonyms(name, CANON(ELLIPSIS_3))) {  // variadic
                 if (is_variadic)
-                    return Error_User("FFI: Duplicate ... indicating variadic");
+                    panic ("FFI: Duplicate ... indicating variadic");
 
                 is_variadic = true;
 
@@ -1291,28 +1276,26 @@ Option(Error*) Trap_Alloc_Ffi_Action_For_Spec(
             }
             else {  // ordinary argument
                 if (is_variadic)
-                    return Error_User("FFI: Variadic must be final parameter");
+                    panic ("FFI: Variadic must be final parameter");
 
                 ++item;
 
                 DECLARE_ELEMENT (block);
-                Derelativize(block, item, Cell_List_Binding(ffi_spec));
+                Derelativize(block, item, List_Binding(ffi_spec));
 
                 Init_Word(PUSH(), name);
-                Option(Error*) e = Trap_Make_Schema_From_Block(
+                required (Make_Schema_From_Block(
                     Alloc_Tail_Array(args_schemas),  // schema (out)
-                    PUSH(),  // param (out)
+                    u_cast(Sink(Element), PUSH()),  // param (out)
                     block,  // block (in)
                     name
-                );
-                if (e)
-                    return e;
+                ));
 
                 ++num_fixed;
             }
         }
         else
-            return Error_Bad_Value(item);
+            panic (item);
     }
 
   pop_paramlist_and_create_routine: { ////////////////////////////////////////
@@ -1320,12 +1303,9 @@ Option(Error*) Trap_Alloc_Ffi_Action_For_Spec(
     Option(Phase*) prior = nullptr;
     Option(VarList*) prior_coupling = nullptr;
 
-    ParamList* paramlist;
-    Option(Error*) e = Trap_Pop_Paramlist(
-        &paramlist, base, prior, prior_coupling
-    );
-    if (e)
-        return e;
+    ParamList* paramlist = require (Pop_Paramlist(
+        base, prior, prior_coupling
+    ));
 
     r = Make_Dispatch_Details(
         DETAILS_MASK_NONE,
@@ -1358,10 +1338,9 @@ Option(Error*) Trap_Alloc_Ffi_Action_For_Spec(
     // must stay alive for the lifetime of the args_fftyps (apparently).
 
     if (Is_Routine_Variadic(r)) {
-        Init_Unreadable(Routine_At(r, IDX_ROUTINE_CIF));
         Init_Unreadable(Routine_At(r, IDX_ROUTINE_ARG_FFTYPES));
-        *out = r;
-        return SUCCESS;
+        Init_Unreadable(Routine_At(r, IDX_ROUTINE_CIF));
+        return r;
     }
 
     ffi_cif* cif = Try_Alloc_Memory(ffi_cif);
@@ -1388,7 +1367,7 @@ Option(Error*) Trap_Alloc_Ffi_Action_For_Spec(
             args_fftypes  // nullptr if 0 fixed args
         )
     ){
-        return Error_User("FFI: Couldn't prep CIF");
+        panic ("FFI: Couldn't prep CIF");
     }
 
     Init_Handle_Cdata_Managed(
@@ -1408,8 +1387,7 @@ Option(Error*) Trap_Alloc_Ffi_Action_For_Spec(
             &cleanup_args_fftypes
         );  // lifetime must match cif lifetime
 
-    *out = r;
-    return SUCCESS;
+    return r;
 }}
 
 
@@ -1439,15 +1417,12 @@ DECLARE_NATIVE(MAKE_ROUTINE)
 
     RebolValue* handle = rebEntrap("pick", ARG(LIB), ARG(NAME));
     if (Is_Warning(handle))  // PICK returned error, entrap made it plain
-        return PANIC(Cell_Error(handle));
+        panic (Cell_Error(handle));
 
     Unquotify(Known_Element(handle));  // rebEntrap() is quoted for non-error
     assert(Is_Handle_Cfunc(handle));
 
-    RoutineDetails* r;
-    Option(Error*) e = Trap_Alloc_Ffi_Action_For_Spec(&r, spec, abi);
-    if (e)
-        return PANIC(unwrap e);
+    RoutineDetails* r = require (Alloc_Ffi_Action_For_Spec(spec, abi));
 
     Copy_Cell(Routine_At(r, IDX_ROUTINE_CFUNC), handle);
     rebRelease(handle);
@@ -1489,12 +1464,9 @@ DECLARE_NATIVE(MAKE_ROUTINE_RAW)
         cast(uintptr_t, VAL_INT64(ARG(POINTER))
     ));
     if (cfunc == nullptr)
-        return PANIC("FFI: nullptr pointer not allowed for raw MAKE-ROUTINE");
+        panic ("FFI: nullptr pointer not allowed for raw MAKE-ROUTINE");
 
-    RoutineDetails* r;
-    Option(Error*) e = Trap_Alloc_Ffi_Action_For_Spec(&r, spec, abi);
-    if (e)
-        return PANIC(unwrap e);
+    RoutineDetails* r = require (Alloc_Ffi_Action_For_Spec(spec, abi));
 
     Init_Handle_Cfunc(Routine_At(r, IDX_ROUTINE_CFUNC), cfunc);
     Init_Space(Routine_At(r, IDX_ROUTINE_CLOSURE));
@@ -1531,10 +1503,7 @@ DECLARE_NATIVE(WRAP_CALLBACK)
 
     Element* spec = Element_ARG(FFI_SPEC);
 
-    RoutineDetails* r;
-    Option(Error*) e = Trap_Alloc_Ffi_Action_For_Spec(&r, spec, abi);
-    if (e)
-        return PANIC(unwrap e);
+    RoutineDetails* r = require (Alloc_Ffi_Action_For_Spec(spec, abi));
 
     void *thunk;  // actually CFUNC (FFI uses void*, may not be same size!)
     ffi_closure *closure = cast(ffi_closure*, ffi_closure_alloc(
@@ -1542,7 +1511,7 @@ DECLARE_NATIVE(WRAP_CALLBACK)
     ));
 
     if (closure == nullptr)
-        return PANIC("FFI: Couldn't allocate closure");
+        panic ("FFI: Couldn't allocate closure");
 
     ffi_status status = ffi_prep_closure_loc(
         closure,
@@ -1553,11 +1522,11 @@ DECLARE_NATIVE(WRAP_CALLBACK)
     );
 
     if (status != FFI_OK)
-        return PANIC("FFI: Couldn't prep closure");
+        panic ("FFI: Couldn't prep closure");
 
     bool check = true;  // avoid "conditional expression is constant"
     if (check and sizeof(void*) != sizeof(CFunction*))
-        return PANIC("FFI requires void* size equal C function pointer size");
+        panic ("FFI requires void* size equal C function pointer size");
 
     CFunction* cfunc_thunk;  // FFI uses wrong type [1]
     memcpy(&cfunc_thunk, &thunk, sizeof(cfunc_thunk));
