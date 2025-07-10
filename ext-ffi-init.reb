@@ -128,7 +128,7 @@ export make-callback: function [
     let safe: function r-args
         (if fallback [
             compose2:deep '{} inside body '[
-                sys.util/rescue:relax [
+                sys.util/recover:relax [
                     return {as group! bindable body}
                 ] then error -> [
                     print "** RESCUED CRITICAL ERROR DURING FFI CALLBACK:"
