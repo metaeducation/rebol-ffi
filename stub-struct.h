@@ -321,7 +321,7 @@ INLINE StructInstance* Cell_Struct(const Cell* cell) {
         if (Cell_Handle_Len(data) == 0) {  // inaccessible data
             DECLARE_ELEMENT (i);
             Init_Integer(i, i_cast(intptr_t, Struct_Data_Head(stu)));
-            abrupt_panic (Error_Bad_Memory_Raw(i, i));  // !!! Can't pass stu?
+            panic (Error_Bad_Memory_Raw(i, i));  // !!! Can't pass stu?
         }
     }
     return stu;
@@ -379,4 +379,7 @@ INLINE Element* Init_Struct(Init(Element) out, StructInstance* stu) {
 // struct logic to create a structure that models their parameters.)
 //
 
-extern Result(Element*) Make_Struct(Sink(Element) out, const Element* arg);
+extern Result(Element*) Make_Struct(
+    Sink(Element) out,
+    const Element* arg
+);

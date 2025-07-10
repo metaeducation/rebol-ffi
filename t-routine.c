@@ -144,7 +144,7 @@ static ffi_abi Abi_From_Word_Or_Nulled(const Value* word) {
 // Writes into `schema_out` a Rebol value which describes either a basic FFI
 // type or the layout of a STRUCT! (not including data).
 //
-static Result(Nothing) Make_Schema_From_Block(
+static Result(Zero) Make_Schema_From_Block(
     Sink(Element) schema_out,  // => INTEGER! or HANDLE! for struct
     Option(Sink(Element)) param_out,  // => parameter for use in ACTION!s
     const Element* block,
@@ -192,7 +192,7 @@ static Result(Nothing) Make_Schema_From_Block(
             );
             // TBD: constrain with STRUCT!
         }
-        return nothing;
+        return zero;
     }
 
     if (Is_Struct(item)) {
@@ -204,7 +204,7 @@ static Result(Nothing) Make_Schema_From_Block(
             );
             // TBD: constrain with STRUCT!
         }
-        return nothing;
+        return zero;
     }
 
     if (Series_Len_At(block) != 1)
@@ -242,7 +242,7 @@ static Result(Nothing) Make_Schema_From_Block(
         }
     }
 
-    return nothing;
+    return zero;
 }
 
 
@@ -373,7 +373,7 @@ static Result(Offset) Cell_To_Ffi(
     char *data;
     Size size;
 
-    switch (Word_Id(schema)) {
+    switch (maybe Word_Id(schema)) {
       case EXT_SYM_UINT8: {
         if (not arg)
             buffer.u8 = 0;  // return value, make space (but initialize)
@@ -477,7 +477,7 @@ static Result(Offset) Cell_To_Ffi(
         else if (Is_Nulled(arg)) {
             buffer.ipt = 0;
         }
-        else switch (Type_Of(arg)) {
+        else switch (maybe Type_Of(arg)) {
           case TYPE_INTEGER:
             buffer.ipt = VAL_INT64(arg);
             break;
@@ -488,7 +488,7 @@ static Result(Offset) Cell_To_Ffi(
         // GC compaction even if not changed)...so the memory is not "stable".
         //
           case TYPE_TEXT:  // !!! copies a *pointer*!
-            buffer.ipt = i_cast(intptr_t, c_cast(Byte*, Cell_Utf8_At(arg)));
+            buffer.ipt = i_cast(intptr_t, u_cast(Byte*, Cell_Utf8_At(arg)));
             break;
 
           case TYPE_BLOB:  // !!! copies a *pointer*!
@@ -587,7 +587,7 @@ static Result(Offset) Cell_To_Ffi(
 
 // Convert a C value into a Rebol value.  Reverse of Cell_To_Ffi().
 //
-static Result(Nothing) Ffi_To_Cell(
+static Result(Zero) Ffi_To_Cell(
     Sink(Value) out,
     const Element* schema,
     void* ffi_rvalue
@@ -598,7 +598,9 @@ static Result(Nothing) Ffi_To_Cell(
         assert(Field_Is_Struct(top));
         assert(not Field_Is_C_Array(top));  // !!! wasn't supported, should be?
 
-        StructInstance* stu = Prep_Stub(STUB_MASK_STRUCT, Alloc_Stub());
+        StructInstance* stu = trap (
+            nocast Prep_Stub(STUB_MASK_STRUCT, Alloc_Stub())
+        );
         Force_Erase_Cell(Stub_Cell(stu));
         LINK_STRUCT_SCHEMA(stu) = top;
         STRUCT_OFFSET(stu) = 0;
@@ -621,12 +623,12 @@ static Result(Nothing) Ffi_To_Cell(
         Init_Blob(Stub_Cell(stu), data);
 
         assert(Struct_Data_Head(stu) == Binary_Head(data));
-        return nothing;
+        return zero;
     }
 
     assert(Is_Word(schema));
 
-    switch (Word_Id(schema)) {
+    switch (maybe Word_Id(schema)) {
       case EXT_SYM_UINT8:
         Init_Integer(out, *cast(uint8_t*, ffi_rvalue));
         break;
@@ -688,7 +690,7 @@ static Result(Nothing) Ffi_To_Cell(
         panic ("Unknown FFI type indicator");
     }
 
-    return nothing;
+    return zero;
 }
 
 
@@ -764,7 +766,7 @@ Bounce Routine_Dispatcher(Level* const L)
         if (Is_Ghost(OUT))
             break;
 
-        Value* out = Decay_If_Unstable(OUT);
+        Value* out = require (Decay_If_Unstable(OUT));
         Copy_Cell(PUSH(), out);
     } while (true);
 
@@ -807,16 +809,18 @@ Bounce Routine_Dispatcher(Level* const L)
             key,
             param
         ));
-        ret_offset = p_cast(void*, offset);
+        ret_offset = cast(void*, offset);
     }
     else
-        ret_offset = p_cast(void*, cast(Offset, 0xDECAFBAD));  // unused [1]
+        ret_offset = cast(void*, cast(Offset, 0xDECAFBAD));  // unused [1]
 
     Flex* arg_offsets;
     if (num_args == 0)
         arg_offsets = nullptr;  // don't waste time with the alloc + free
     else {
-        arg_offsets = Make_Flex(FLAG_FLAVOR(FLAVOR_POINTERS), Flex, num_args);
+        arg_offsets = require (
+            Make_Flex(FLAG_FLAVOR(FLAVOR_POINTERS), num_args)
+        );
         Set_Flex_Len(arg_offsets, num_args);
     }
 
@@ -1107,35 +1111,37 @@ void callback_dispatcher(  // client C code calls this, not the trampoline
     }
 
     Set_Flex_Len(arr, 1 + cif->nargs);
-    Manage_Flex(arr);  // DO requires managed arrays (guarded while running)
+    Manage_Stub(arr);  // DO requires managed arrays (guarded while running)
 
     DECLARE_ELEMENT (code);
     Init_Block(code, arr);
 
     DECLARE_ATOM (result);
 
-  RESCUE_SCOPE_IN_CASE_OF_ABRUPT_PANIC {  ////////////////////////////////////
+  RECOVER_SCOPE_CLOBBERS_ABOVE_LOCALS_IF_MODIFIED {
 
-    // 1. If a callback encounters an un-trapped panic() in mid-run, or if the
-    //    execution attempts to throw (e.g. CONTINUE or THROW natives called)
-    //    there's nothing we can do here to guess what its C contract return
-    //    value should be.  And we can't just jump up to the next trap point,
-    //    because that would cross unknown client C code using the FFI (if it
-    //    were C++, the destructors might not run, etc.)
-    //
-    //    See MAKE-CALLBACK:FALLBACK for the usermode workaround.
+  // 1. If a callback encounters an un-trapped panic() in mid-run, or if the
+  //    execution attempts to throw (e.g. CONTINUE or THROW natives called)
+  //    there's nothing we can do here to guess what its C contract return
+  //    value should be.  And we can't just jump up to the next trap point,
+  //    because that would cross unknown client C code using the FFI (if it
+  //    were C++, the destructors might not run, etc.)
+  //
+  //    See MAKE-CALLBACK:FALLBACK for the usermode workaround.
 
     if (Eval_Any_List_At_Throws(result, code, SPECIFIED))
         crash (Error_No_Catch_For_Throw(TOP_LEVEL));  // THROW, CONTINUE... [1]
 
-    Decay_If_Unstable(result);  // RAISED! panic()s, jumps to ON_ABRUPT_PANIC
+    Decay_If_Unstable(result) excepted (Error* e) {
+        panic (e);  // RAISED! panic()s, jumps to ON_ABRUPT_PANIC
+    }
 
-    CLEANUP_BEFORE_EXITING_RESCUE_SCOPE;
+    CLEANUP_BEFORE_EXITING_RECOVER_SCOPE;
     goto finished_rebol_call;
 
-} ON_ABRUPT_PANIC(error) {  //////////////////////////////////////////////////
+} ON_ABRUPT_PANIC(Error* e) { ////////////////////////////////////////////////
 
-    crash (error);  // can't give meaningful return value on panic() [1]
+    crash (e);  // can't give meaningful return value on panic() [1]
 
 } finished_rebol_call: { /////////////////////////////////////////////////////
 
@@ -1147,19 +1153,16 @@ void callback_dispatcher(  // client C code calls this, not the trampoline
 
         const Symbol* spelling = CANON(RETURN);
         const Param* param = nullptr;
-        Offset offset;
-        sys_util_rescue (
-            offset = Cell_To_Ffi(
-                nullptr,  // store must be null if dest is non-null,
-                ret,  // destination pointer
-                cast(Value*, result),
-                unwrap ret_schema,
-                label,
-                &spelling,  // parameter used for symbol in error only
-                param
-            )
-        ) (Error* e) {
-            abrupt_panic (e);
+        Offset offset = Cell_To_Ffi(
+            nullptr,  // store must be null if dest is non-null,
+            ret,  // destination pointer
+            cast(Value*, result),
+            unwrap ret_schema,
+            label,
+            &spelling,  // parameter used for symbol in error only
+            param
+        ) except (Error* e) {
+            panic (e);
         }
         UNUSED(offset);
     }
@@ -1343,13 +1346,14 @@ Result(RoutineDetails*) Alloc_Ffi_Action_For_Spec(
         return r;
     }
 
-    ffi_cif* cif = Try_Alloc_Memory(ffi_cif);
+    ffi_cif* cif = require (Alloc_On_Heap(ffi_cif));
 
     ffi_type** args_fftypes;
     if (num_fixed == 0)
         args_fftypes = nullptr;
-    else
-        args_fftypes = Try_Alloc_Memory_N(ffi_type*, num_fixed);
+    else {
+        args_fftypes = require (Alloc_N_On_Heap(ffi_type*, num_fixed));
+    }
 
     REBLEN i;
     for (i = 0; i < num_fixed; ++i)
@@ -1415,11 +1419,11 @@ DECLARE_NATIVE(MAKE_ROUTINE)
 
     Element* spec = Element_ARG(FFI_SPEC);
 
-    RebolValue* handle = rebEntrap("pick", ARG(LIB), ARG(NAME));
-    if (Is_Warning(handle))  // PICK returned error, entrap made it plain
-        panic (Cell_Error(handle));
+    RebolValue* handle;
+    RebolValue* warning = rebRescue2(&handle, "pick", ARG(LIB), ARG(NAME));
+    if (warning)  // PICK returned ERROR!, Rescue made WARNING!
+        panic (Cell_Error(warning));
 
-    Unquotify(Known_Element(handle));  // rebEntrap() is quoted for non-error
     assert(Is_Handle_Cfunc(handle));
 
     RoutineDetails* r = require (Alloc_Ffi_Action_For_Spec(spec, abi));

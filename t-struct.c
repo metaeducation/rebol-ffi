@@ -47,7 +47,7 @@ static void cleanup_ffi_type(void* p, size_t length) {
 //    depending on whether the data is owned by Rebol or not.  That series
 //    pointer is being referenced again by the child struct we give back.
 //
-static Result(Nothing) Get_Scalar_In_Struct(
+static Result(Zero) Get_Scalar_In_Struct(
     Sink(Value) out,  // if EXT_SYM_REBVAL, could be any value
     StructInstance* stu,
     StructField* field,
@@ -68,7 +68,7 @@ static Result(Nothing) Get_Scalar_In_Struct(
         STRUCT_OFFSET(sub_stu) = offset;
         assert(Struct_Total_Size(sub_stu) == Field_Width(field));
         Init_Struct(out, sub_stu);
-        return nothing;
+        return zero;
     }
 
     Byte* p = offset + Struct_Data_Head(stu);
@@ -127,7 +127,7 @@ static Result(Nothing) Get_Scalar_In_Struct(
         panic ("Unknown FFI type indicator");
     }
 
-    return nothing;
+    return zero;
 }
 
 
@@ -293,7 +293,7 @@ static bool Same_Fields(const Array* a_fieldlist, const Array* b_fieldlist)
 }
 
 
-static Result(Nothing) Set_Scalar_In_Struct_core(
+static Result(Zero) Set_Scalar_In_Struct_core(
     Byte* data_head,
     REBLEN offset,
     StructField* field,
@@ -321,7 +321,7 @@ static Result(Nothing) Set_Scalar_In_Struct_core(
 
         memcpy(data, Cell_Struct_Data_At(val), Field_Width(field));
 
-        return nothing;
+        return zero;
     }
 
     // All other types take numbers
@@ -329,7 +329,7 @@ static Result(Nothing) Set_Scalar_In_Struct_core(
     int64_t i;
     double d;
 
-    switch (Type_Of(val)) {
+    switch (maybe Type_Of(val)) {
       case TYPE_DECIMAL:
         d = VAL_DECIMAL(val);
         i = cast(int64_t, d);
@@ -432,11 +432,11 @@ static Result(Nothing) Set_Scalar_In_Struct_core(
         panic ("unknown Field_Type_Id()");
     }
 
-    return nothing;
+    return zero;
 }
 
 
-INLINE Result(Nothing) Set_Scalar_In_Struct(
+Result(Zero) Set_Scalar_In_Struct(
     StructInstance* stu,
     StructField* field,
     REBLEN n,
@@ -448,7 +448,7 @@ INLINE Result(Nothing) Set_Scalar_In_Struct(
 }
 
 
-static Result(Nothing) Parse_Struct_Attribute(
+static Result(Zero) Parse_Struct_Attribute(
     const Element* block,
     REBINT *raw_size,
     uintptr_t *raw_addr
@@ -463,7 +463,7 @@ static Result(Nothing) Parse_Struct_Attribute(
         if (not Is_Set_Word(attr))
             panic (attr);
 
-        switch (Word_Id(attr)) {
+        switch (maybe Word_Id(attr)) {
           case EXT_SYM_RAW_SIZE:
             ++attr;
             if (attr == tail or not Is_Integer(attr))
@@ -503,9 +503,10 @@ static Result(Nothing) Parse_Struct_Attribute(
             if (not Any_String(linkname))
                 panic (linkname);
 
-            RebolValue* result = rebEntrap("pick", lib, linkname);
-            if (Is_Warning(result))
-                panic (Cell_Error(result));
+            RebolValue* result;
+            RebolValue* warning = rebRescue2(&result, "pick", lib, linkname);
+            if (warning)
+                panic (Cell_Error(warning));
 
             Unquotify(Known_Element(result));
             assert(Is_Handle(result));
@@ -531,7 +532,7 @@ static Result(Nothing) Parse_Struct_Attribute(
         ++attr;
     }
 
-    return nothing;
+    return zero;
 }
 
 
@@ -554,7 +555,7 @@ static void cleanup_noop(void* p, size_t length) {
 // external pointer.  This uses a managed HANDLE! for the same purpose, as
 // a less invasive way of doing the same thing.
 //
-static Result(Nothing) Set_Struct_Storage_External(
+static Result(Zero) Set_Struct_Storage_External(
     StructInstance* stu,
     REBLEN len,
     REBINT raw_size,
@@ -573,7 +574,7 @@ static Result(Nothing) Set_Struct_Storage_External(
         &cleanup_noop
     );
 
-    return nothing;
+    return zero;
 }
 
 
@@ -686,7 +687,7 @@ static void Prepare_Field_For_Ffi(StructField* schema)
 // will actually be creating a new `inner` STRUCT! value.  Since this value
 // is managed and not referred to elsewhere, there can't be evaluations.
 //
-static Result(Nothing) Parse_Field_Type(
+static Result(Zero) Parse_Field_Type(
     StructField* field,
     const Element* spec,
     Sink(Element) inner  // will be set only if STRUCT!
@@ -705,7 +706,7 @@ static Result(Nothing) Parse_Field_Type(
         //
         Copy_Cell(Field_Detail(field, IDX_FIELD_TYPE), val);
 
-        switch (id) {
+        switch (maybe id) {
           case EXT_SYM_UINT8:
             Init_Integer(Field_Detail(field, IDX_FIELD_WIDE), 1);
             Prepare_Field_For_Ffi(field);
@@ -866,14 +867,14 @@ static Result(Nothing) Parse_Field_Type(
     else
         panic (Error_Invalid_Type_Raw(Datatype_Of(val)));
 
-    return nothing;
+    return zero;
 }
 
 
 // a: make struct! [uint 8 i: 1]
 // b: make a [i: 10]
 //
-Result(Nothing) Init_Struct_Fields(
+Result(Zero) Init_Struct_Fields(
     Sink(Element) ret,
     const Element* spec
 ){
@@ -971,7 +972,7 @@ Result(Nothing) Init_Struct_Fields(
         spec_item += 2;
     }
 
-    return nothing;
+    return zero;
 }
 
 
@@ -996,7 +997,9 @@ Result(Element*) Make_Struct(Sink(Element) out, const Element* arg)
     if (Series_Len_At(arg) == 0)
         panic ("Empty Struct Definitions not legal");
 
-    Level* L = Make_Level_At(&Stepper_Executor, arg, LEVEL_MASK_NONE);
+    Level* L = require (
+        Make_Level_At(&Stepper_Executor, arg, LEVEL_MASK_NONE)
+    );
     const Element* at = At_Level(L);
 
     DECLARE_ATOM (eval);
@@ -1277,9 +1280,11 @@ Result(Element*) Make_Struct(Sink(Element) out, const Element* arg)
 
 } finalize_struct: { /////////////////////////////////////////////////////////
 
-    StructInstance* stu = Prep_Stub(STUB_MASK_STRUCT, Alloc_Stub());
+    StructInstance* stu = require (
+        nocast Prep_Stub(STUB_MASK_STRUCT, Alloc_Stub())
+    );
     Force_Erase_Cell(Stub_Cell(stu));
-    Manage_Flex(schema);
+    Manage_Stub(schema);
     LINK_STRUCT_SCHEMA(stu) = schema;
 
     if (raw_addr) {
@@ -1476,7 +1481,9 @@ IMPLEMENT_GENERIC(EQUAL_Q, Is_Struct)
 //
 StructInstance* Copy_Struct_Managed(StructInstance* src)
 {
-    StructInstance* copy = Prep_Stub(STUB_MASK_STRUCT, Alloc_Stub());
+    StructInstance* copy = require (
+        nocast Prep_Stub(STUB_MASK_STRUCT, Alloc_Stub())
+    );
     Force_Erase_Cell(Stub_Cell(copy));
 
     LINK_STRUCT_SCHEMA(copy) = LINK_STRUCT_SCHEMA(src);  // share the schema
@@ -1500,7 +1507,7 @@ IMPLEMENT_GENERIC(OLDGENERIC, Is_Struct)
     Element* val = Known_Element(ARG_N(1));
     const Symbol* verb = Level_Verb(LEVEL);
 
-    switch (Symbol_Id(verb)) {
+    switch (maybe Symbol_Id(verb)) {
       case SYM_CHANGE: {
         Value* arg = ARG_N(2);
         if (not Is_Blob(arg))
