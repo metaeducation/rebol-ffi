@@ -1222,6 +1222,8 @@ Result(RoutineDetails*) Alloc_Ffi_Action_For_Spec(
     Count num_fixed = 0;  // number of fixed (non-variadic) arguments
     bool is_variadic = false;  // default to not being variadic
 
+    Option(Element*) methodization = nullptr;  // not applicable for FFI
+
   build_paramlist_on_data_stack: { ///////////////////////////////////////////
 
     // arguments can be complex, defined as structures.  A "schema" is a
@@ -1466,8 +1468,7 @@ DECLARE_NATIVE(MAKE_ROUTINE)
     Init_Space(Routine_At(r, IDX_ROUTINE_CLOSURE));
     Copy_Cell(Routine_At(r, IDX_ROUTINE_ORIGIN), ARG(LIB));
 
-    Init_Action(OUT, r, ANONYMOUS, NONMETHOD);
-    return UNSURPRISING(OUT);
+    return Init_Action(OUT, r, ANONYMOUS, UNCOUPLED);
 }
 
 
@@ -1510,8 +1511,7 @@ DECLARE_NATIVE(MAKE_ROUTINE_RAW)
     Init_Space(Routine_At(r, IDX_ROUTINE_CLOSURE));
     Init_Space(Routine_At(r, IDX_ROUTINE_ORIGIN)); // no LIBRARY! in this case.
 
-    Init_Action(OUT, r, ANONYMOUS, NONMETHOD);
-    return UNSURPRISING(OUT);
+    return Init_Action(OUT, r, ANONYMOUS, UNCOUPLED);
 }
 
 
@@ -1580,6 +1580,5 @@ DECLARE_NATIVE(WRAP_CALLBACK)
     );
     Copy_Cell(Routine_At(r, IDX_ROUTINE_ORIGIN), ARG(ACTION));
 
-    Init_Action(OUT, r, ANONYMOUS, NONMETHOD);
-    return UNSURPRISING(OUT);
+    return Init_Action(OUT, r, ANONYMOUS, UNCOUPLED);
 }
