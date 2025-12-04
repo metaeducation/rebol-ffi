@@ -175,8 +175,9 @@ static Result(None) Make_Schema_From_Block(
 
         Derelativize(def, item, List_Binding(block));
 
-        required (Make_Struct(temp, def));
-
+        require (
+          Make_Struct(temp, def)
+        );
         assert(Is_Struct(temp));
 
         // !!! It should be made possible to create a schema without going
@@ -267,7 +268,9 @@ INLINE static void* Expand_And_Align_Core(
         padding = align - padding;
 
     *offset_out = Binary_Len(store) + padding;
-    Expand_Flex_Tail(store, padding + size);
+    require (
+      Expand_Flex_Tail_And_Update_Used(store, padding + size)
+    );
     return Flex_Data(store) + *offset_out;
 }
 
@@ -598,8 +601,10 @@ static Result(None) Ffi_To_Cell(
         assert(Field_Is_Struct(top));
         assert(not Field_Is_C_Array(top));  // !!! wasn't supported, should be?
 
-        StructInstance* stu = trap (
-            nocast Prep_Stub(STUB_MASK_STRUCT, Alloc_Stub())
+        trap (
+          StructInstance* stu = u_downcast Prep_Stub(
+            STUB_MASK_STRUCT, Alloc_Stub()
+          )
         );
         Force_Erase_Cell(Stub_Cell(stu));
         LINK_STRUCT_SCHEMA(stu) = top;
@@ -766,7 +771,9 @@ Bounce Routine_Dispatcher(Level* const L)
         if (Is_Ghost(OUT))
             break;
 
-        Value* out = require (Decay_If_Unstable(OUT));
+        require (
+          Stable* out = Decay_If_Unstable(OUT)
+        );
         Copy_Cell(PUSH(), out);
     } while (true);
 
@@ -800,7 +807,8 @@ Bounce Routine_Dispatcher(Level* const L)
         const Symbol* ret_sym = CANON(RETURN);
         const Key* key = &ret_sym;  // return values, no name
         const Param* param = nullptr;
-        Offset offset = require (Cell_To_Ffi(
+        require (
+          Offset offset = Cell_To_Ffi(
             store,  // ffi-converted arg appended here
             nullptr,  // dest pointer must be nullptr if store is non-nullptr
             nullptr,  // arg: none (only making space--leave uninitialized)
@@ -818,8 +826,8 @@ Bounce Routine_Dispatcher(Level* const L)
     if (num_args == 0)
         arg_offsets = nullptr;  // don't waste time with the alloc + free
     else {
-        arg_offsets = require (
-            Make_Flex(FLAG_FLAVOR(FLAVOR_POINTERS), num_args)
+        require (
+          arg_offsets = Make_Flex(FLAG_FLAVOR(FLAVOR_POINTERS), num_args)
         );
         Set_Flex_Len(arg_offsets, num_args);
     }
@@ -843,7 +851,8 @@ Bounce Routine_Dispatcher(Level* const L)
         const Value* arg = Known_Stable(Level_Arg(L, i + 1));  // 1-based
         const Element* schema = Routine_Arg_Schema(r, i);  // 0-based
 
-        Offset offset = require (Cell_To_Ffi(
+        require (
+          Offset offset = Cell_To_Ffi(
             store,  // ffi-converted arg appended here
             nullptr,  // dest pointer must be nullptr if store is non-null
             arg,
@@ -897,7 +906,8 @@ Bounce Routine_Dispatcher(Level* const L)
 
         StackIndex dsp;
         for (dsp = base + 1; i < num_args; dsp += 2, ++i) {
-            required (Make_Schema_From_Block(  // [3]
+            require (
+              Make_Schema_From_Block(  // [3]
                 schema,
                 param, // sets type bits in param
                 Data_Stack_At(Element, dsp + 1), // errors if not a block
@@ -907,7 +917,8 @@ Bounce Routine_Dispatcher(Level* const L)
             args_fftypes[i] = Schema_Ffi_Type(schema);
 
             const Param* param = nullptr;
-            Offset offset = require (Cell_To_Ffi(
+            require (
+              Offset offset = Cell_To_Ffi(
                 store,  // data appended to store
                 nullptr,  // dest pointer must be null if store is non-null
                 Data_Stack_At(Value, dsp),  // arg
@@ -979,8 +990,11 @@ Bounce Routine_Dispatcher(Level* const L)
     );
 
     Option(Element*) ret_schema = Routine_Return_Schema_Unless_Void(r);
-    if (ret_schema)
-        Ffi_To_Cell(OUT, unwrap ret_schema, ret_offset);
+    if (ret_schema) {
+        require (
+          Ffi_To_Cell(OUT, unwrap ret_schema, ret_offset)
+        );
+    }
     else
         Init_Tripwire(OUT);  // !!! Is ~ antiform best return result for void?
 
@@ -1106,7 +1120,9 @@ void callback_dispatcher(  // client C code calls this, not the trampoline
     REBLEN i;
     for (i = 0; i != cif->nargs; ++i, ++elem) {
         DECLARE_VALUE (value);
-        Ffi_To_Cell(value, Routine_Arg_Schema(r, i), args[i]);
+        require (
+          Ffi_To_Cell(value, Routine_Arg_Schema(r, i), args[i])
+        );
         Copy_Lifted_Cell(elem, value);
     }
 
@@ -1132,7 +1148,7 @@ void callback_dispatcher(  // client C code calls this, not the trampoline
     if (Eval_Any_List_At_Throws(result, code, SPECIFIED))
         crash (Error_No_Catch_For_Throw(TOP_LEVEL));  // THROW, CONTINUE... [1]
 
-    Decay_If_Unstable(result) excepted (Error* e) {
+    Decay_If_Unstable(result) except (Error* e) {
         panic (e);  // RAISED! panic()s, jumps to ON_ABRUPT_PANIC
     }
 
@@ -1246,7 +1262,8 @@ Result(RoutineDetails*) Alloc_Ffi_Action_For_Spec(
             DECLARE_ELEMENT (block);
             Derelativize(block, item, List_Binding(ffi_spec));
 
-            required (Make_Schema_From_Block(
+            require (
+              Make_Schema_From_Block(
                 ret_schema_or_space,
                 nullptr,  // dummy (return/output has no arg to typecheck)
                 block,
@@ -1287,8 +1304,12 @@ Result(RoutineDetails*) Alloc_Ffi_Action_For_Spec(
                 Derelativize(block, item, List_Binding(ffi_spec));
 
                 Init_Word(PUSH(), name);
-                required (Make_Schema_From_Block(
-                    Alloc_Tail_Array(args_schemas),  // schema (out)
+                require (
+                  Sink(Element) cell = Alloc_Tail_Array(args_schemas)
+                );
+                require (
+                  Make_Schema_From_Block(
+                    cell,  // schema (out)
                     u_cast(Sink(Element), PUSH()),  // param (out)
                     block,  // block (in)
                     name
@@ -1306,9 +1327,11 @@ Result(RoutineDetails*) Alloc_Ffi_Action_For_Spec(
     Option(Phase*) prior = nullptr;
     Option(VarList*) prior_coupling = nullptr;
 
-    ParamList* paramlist = require (Pop_Paramlist(
-        base, prior, prior_coupling
-    ));
+    require (
+      ParamList* paramlist = Pop_Paramlist(
+        base, methodization, prior, prior_coupling
+      )
+    );
 
     r = Make_Dispatch_Details(
         DETAILS_MASK_NONE,
@@ -1346,13 +1369,17 @@ Result(RoutineDetails*) Alloc_Ffi_Action_For_Spec(
         return r;
     }
 
-    ffi_cif* cif = require (Alloc_On_Heap(ffi_cif));
+    require (
+      ffi_cif* cif = Alloc_On_Heap(ffi_cif)
+    );
 
     ffi_type** args_fftypes;
     if (num_fixed == 0)
         args_fftypes = nullptr;
     else {
-        args_fftypes = require (Alloc_N_On_Heap(ffi_type*, num_fixed));
+        require (
+          args_fftypes = Alloc_N_On_Heap(ffi_type*, num_fixed)
+        );
     }
 
     REBLEN i;
@@ -1424,9 +1451,14 @@ DECLARE_NATIVE(MAKE_ROUTINE)
     if (warning)  // PICK returned ERROR!, Rescue made WARNING!
         panic (Cell_Error(warning));
 
+    require (
+      Stable* handle = Ensure_Stable(value)
+    );
     assert(Is_Handle_Cfunc(handle));
 
-    RoutineDetails* r = require (Alloc_Ffi_Action_For_Spec(spec, abi));
+    require (
+      RoutineDetails* r = Alloc_Ffi_Action_For_Spec(spec, abi)
+    );
 
     Copy_Cell(Routine_At(r, IDX_ROUTINE_CFUNC), handle);
     rebRelease(handle);
@@ -1470,7 +1502,9 @@ DECLARE_NATIVE(MAKE_ROUTINE_RAW)
     if (cfunc == nullptr)
         panic ("FFI: nullptr pointer not allowed for raw MAKE-ROUTINE");
 
-    RoutineDetails* r = require (Alloc_Ffi_Action_For_Spec(spec, abi));
+    require (
+      RoutineDetails* r = Alloc_Ffi_Action_For_Spec(spec, abi)
+    );
 
     Init_Handle_Cfunc(Routine_At(r, IDX_ROUTINE_CFUNC), cfunc);
     Init_Space(Routine_At(r, IDX_ROUTINE_CLOSURE));
@@ -1507,7 +1541,9 @@ DECLARE_NATIVE(WRAP_CALLBACK)
 
     Element* spec = Element_ARG(FFI_SPEC);
 
-    RoutineDetails* r = require (Alloc_Ffi_Action_For_Spec(spec, abi));
+    require (
+      RoutineDetails* r = Alloc_Ffi_Action_For_Spec(spec, abi)
+    );
 
     void *thunk;  // actually CFUNC (FFI uses void*, may not be same size!)
     ffi_closure *closure = cast(ffi_closure*, ffi_closure_alloc(

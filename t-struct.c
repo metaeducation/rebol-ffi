@@ -158,21 +158,34 @@ Result(Source*) Struct_To_Array(StructInstance* stu)
         Source* typespec = Make_Source(2); // required type
 
         if (Field_Is_Struct(field)) {
-            Init_Word(Alloc_Tail_Array(typespec), EXT_CANON(STRUCT_X));
+            require (
+              Sink(Element) cell = Alloc_Tail_Array(typespec)
+            );
+            Init_Word(cell, EXT_CANON(STRUCT_X));
 
             DECLARE_VALUE (nested);
-            required (Get_Scalar_In_Struct(nested, stu, field, 0));
+            require (
+              Get_Scalar_In_Struct(nested, stu, field, 0)
+            );
             assert(Is_Struct(nested));
 
             Push_Lifeguard(nested); // is this guard still necessary?
-            Source* array = require (Struct_To_Array(Cell_Struct(nested)));
-            Init_Block(Alloc_Tail_Array(typespec), array);
+            require (
+              Source* array = Struct_To_Array(Cell_Struct(nested))
+            );
+            require (
+              cell = Alloc_Tail_Array(typespec)
+            );
+            Init_Block(cell, array);
             Drop_Lifeguard(nested);
         }
         else {
             // Elemental type (from a fixed list of known C types)
             //
-            Init_Word(Alloc_Tail_Array(typespec), Field_Type_Symbol(field));
+            require (
+              Sink(Element) cell = Alloc_Tail_Array(typespec)
+            );
+            Init_Word(cell, Field_Type_Symbol(field));
         }
 
         // "optional dimension and initialization."
@@ -189,7 +202,10 @@ Result(Source*) Struct_To_Array(StructInstance* stu)
                 FLAG_FLAVOR(FLAVOR_SOURCE) | BASE_FLAG_MANAGED
             );
             Init_Integer(Stub_Cell(one_int), dimension);
-            Init_Block(Alloc_Tail_Array(typespec), one_int);
+            require (
+              Sink(Element) cell = Alloc_Tail_Array(typespec)
+            );
+            Init_Block(cell, one_int);
 
             // Initialization seems to be just another block after that (?)
             //
@@ -199,19 +215,29 @@ Result(Source*) Struct_To_Array(StructInstance* stu)
             REBLEN n;
             for (n = 0; n < dimension; n ++) {
                 DECLARE_VALUE (scalar);
-                required (Get_Scalar_In_Struct(scalar, stu, field, n));
+                require (
+                  Get_Scalar_In_Struct(scalar, stu, field, n)
+                );
                 if (Is_Antiform(scalar))
                     panic ("Can't put antiform in block for Struct_To_Array()");
                 Copy_Cell(Array_At(init, n), cast(Element*, scalar));
             }
-            Init_Block(Alloc_Tail_Array(typespec), init);
+            require (
+              cell = Alloc_Tail_Array(typespec)
+            );
+            Init_Block(cell, init);
         }
         else {
             DECLARE_VALUE (scalar);
-            required (Get_Scalar_In_Struct(scalar, stu, field, 0));
+            require (
+              Get_Scalar_In_Struct(scalar, stu, field, 0)
+            );
             if (Is_Antiform(scalar))
                 panic ("Can't put antiform in block for Struct_To_Array()");
-            Copy_Cell(Alloc_Tail_Array(typespec), Known_Element(scalar));
+            require (
+              Sink(Element) cell = Alloc_Tail_Array(typespec)
+            );
+            Copy_Cell(cell, Known_Element(scalar));
         }
 
         Init_Block(PUSH(), typespec); // required type
@@ -225,7 +251,7 @@ IMPLEMENT_GENERIC(MOLDIFY, Is_Struct)
 {
     INCLUDE_PARAMS_OF_MOLDIFY;
 
-    Element* cell = Element_ARG(ELEMENT);
+    Element* cell = Element_ARG(VALUE);
     Molder* mo = Cell_Handle_Pointer(Molder, ARG(MOLDER));
     bool form = Bool_ARG(FORM);
 
@@ -233,7 +259,9 @@ IMPLEMENT_GENERIC(MOLDIFY, Is_Struct)
 
     Begin_Non_Lexical_Mold(mo, cell);
 
-    Array* array = require (Struct_To_Array(Cell_Struct(cell)));
+    require (
+      Array* array = Struct_To_Array(Cell_Struct(cell))
+    );
     Mold_Array_At(mo, array, 0, "[]");
     Free_Unmanaged_Flex(array);
 
@@ -771,7 +799,9 @@ static Result(None) Parse_Field_Type(
             Derelativize(specific, val, List_Binding(spec));
 
             Push_Lifeguard(specific);
-            required (Make_Struct(inner, specific));
+            require (
+              Make_Struct(inner, specific)
+            );
             Drop_Lifeguard(specific);  // panic should handle lifguards
 
             Init_Integer(
@@ -858,6 +888,10 @@ static Result(None) Parse_Field_Type(
         if (Eval_Any_List_At_Throws(ret, val, derived))
             panic (Error_No_Catch_For_Throw(TOP_LEVEL));
 
+        require (
+          Decay_If_Unstable(atom_ret)
+        );
+
         if (not Is_Integer(ret))
             panic (Error_Unexpected_Type(TYPE_INTEGER, Datatype_Of(val)));
 
@@ -891,11 +925,13 @@ Result(None) Init_Struct_Fields(
             if (Series_Len_Head(spec) != 1)
                 panic (spec);
 
-            required (Parse_Struct_Attribute(
+            require (
+              Parse_Struct_Attribute(
                 spec_item, &raw_size, &raw_addr
             ));
 
-            required (Set_Struct_Storage_External(
+            require (
+              Set_Struct_Storage_External(
                 Cell_Struct(ret),
                 Cell_Struct_Total_Size(ret),
                 raw_size,
@@ -934,7 +970,8 @@ Result(None) Init_Struct_Fields(
                     REBLEN n = 0;
                     const Element* at = List_Item_At(fld_val);
                     for (n = 0; n < dimension; ++n, ++at) {
-                        required (Set_Scalar_In_Struct(
+                        require (
+                          Set_Scalar_In_Struct(
                             Cell_Struct(ret), field, n, at
                         ));
                     }
@@ -955,7 +992,8 @@ Result(None) Init_Struct_Fields(
                     panic (fld_val);
             }
             else {
-                required (Set_Scalar_In_Struct(
+                require (
+                  Set_Scalar_In_Struct(
                     Cell_Struct(ret),
                     field,
                     0,
@@ -997,8 +1035,8 @@ Result(Element*) Make_Struct(Sink(Element) out, const Element* arg)
     if (Series_Len_At(arg) == 0)
         panic ("Empty Struct Definitions not legal");
 
-    Level* L = require (
-        Make_Level_At(&Stepper_Executor, arg, LEVEL_MASK_NONE)
+    require (
+      Level* L = Make_Level_At(&Stepper_Executor, arg, LEVEL_MASK_NONE)
     );
     const Element* at = At_Level(L);
 
@@ -1058,7 +1096,8 @@ Result(Element*) Make_Struct(Sink(Element) out, const Element* arg)
         DECLARE_ELEMENT (specific);
         Derelativize(specific, at, List_Binding(arg));
 
-        required (Parse_Struct_Attribute(
+        require (
+          Parse_Struct_Attribute(
             specific, &raw_size, &raw_addr
         ));
 
@@ -1137,7 +1176,9 @@ Result(Element*) Make_Struct(Sink(Element) out, const Element* arg)
 
     // Fills in the width, dimension, type, and ffi_type (if needed)
     //
-    required (Parse_Field_Type(field, spec, init));
+    require (
+      Parse_Field_Type(field, spec, init)
+    );
 
     REBLEN dimension = Field_Is_C_Array(field) ? Field_Dimension(field) : 1;
 
@@ -1156,8 +1197,11 @@ Result(Element*) Make_Struct(Sink(Element) out, const Element* arg)
     if (step > VAL_STRUCT_LIMIT)
         panic (Error_Size_Limit_Raw(out));
 
-    if (raw_addr == 0)
-        Expand_Flex_Tail(data_bin, step);
+    if (raw_addr == 0) {
+        require (
+          Expand_Flex_Tail_And_Update_Used(data_bin, step)
+        );
+    }
 
     Fetch_Next_In_Feed(L->feed);
     Corrupt_If_Needful(at);
@@ -1186,6 +1230,10 @@ Result(Element*) Make_Struct(Sink(Element) out, const Element* arg)
             Erase_Cell(init);
             if (Eval_Step_Throws(init, L))
                 panic (Error_No_Catch_For_Throw(TOP_LEVEL));
+
+            require (
+              Decay_If_Unstable(atom_init)
+            );
         }
 
         if (Field_Is_C_Array(field)) {
@@ -1206,7 +1254,8 @@ Result(Element*) Make_Struct(Sink(Element) out, const Element* arg)
                 const Element* at = List_Item_At(init);
 
                 for (Offset n = 0; n < Field_Dimension(field); ++n, ++at) {
-                    required (Set_Scalar_In_Struct_core(
+                    require (
+                      Set_Scalar_In_Struct_core(
                         Binary_Head(data_bin),
                         offset,
                         field,
@@ -1221,7 +1270,8 @@ Result(Element*) Make_Struct(Sink(Element) out, const Element* arg)
                 ));
         }
         else {  // scalar
-            required (Set_Scalar_In_Struct_core(
+            require (
+              Set_Scalar_In_Struct_core(
                 Binary_Head(data_bin), offset, field, 0, init
             ));
         }
@@ -1280,15 +1330,16 @@ Result(Element*) Make_Struct(Sink(Element) out, const Element* arg)
 
 } finalize_struct: { /////////////////////////////////////////////////////////
 
-    StructInstance* stu = require (
-        nocast Prep_Stub(STUB_MASK_STRUCT, Alloc_Stub())
+    require (
+      StructInstance* stu = u_downcast Prep_Stub(STUB_MASK_STRUCT, Alloc_Stub())
     );
     Force_Erase_Cell(Stub_Cell(stu));
     Manage_Stub(schema);
     LINK_STRUCT_SCHEMA(stu) = schema;
 
     if (raw_addr) {
-        required (Set_Struct_Storage_External(
+        require (
+          Set_Struct_Storage_External(
             stu,
             Field_Total_Size(schema),
             raw_size,
@@ -1319,8 +1370,9 @@ IMPLEMENT_GENERIC(MAKE, Is_Struct)
     if (not Is_Block(arg))
         panic (PARAM(DEF));
 
-    required (Make_Struct(OUT, arg));
-
+    require (
+      Make_Struct(OUT, arg)
+    );
     return OUT;
 }
 
@@ -1371,7 +1423,9 @@ IMPLEMENT_GENERIC(TWEAK_P, Is_Struct)
             continue;
 
         if (not Field_Is_C_Array(field)) {
-            required (Get_Scalar_In_Struct(OUT, stu, field, 0));  // index 0
+            require (
+              Get_Scalar_In_Struct(OUT, stu, field, 0)  // index 0
+            );
             return DUAL_LIFTED(OUT);
         }
 
@@ -1381,7 +1435,9 @@ IMPLEMENT_GENERIC(TWEAK_P, Is_Struct)
         REBLEN n;
         for (n = 0; n < dimension; ++n) {
             DECLARE_VALUE (scalar);
-            required (Get_Scalar_In_Struct(scalar, stu, field, n));
+            require (
+              Get_Scalar_In_Struct(scalar, stu, field, n)
+            );
             if (Is_Antiform(scalar))
                 panic ("Antiforms can't be put in block for PICK");
             Copy_Cell(Array_At(arr, n), Known_Element(scalar));
@@ -1408,7 +1464,9 @@ IMPLEMENT_GENERIC(TWEAK_P, Is_Struct)
             continue;
 
         if (not Field_Is_C_Array(field)) {
-            required (Set_Scalar_In_Struct(stu, field, 0, poke));
+            require (
+              Set_Scalar_In_Struct(stu, field, 0, poke)
+            );
             return NO_WRITEBACK_NEEDED;
         }
 
@@ -1443,7 +1501,9 @@ IMPLEMENT_GENERIC(TWEAK_P, Is_Struct)
         const Element* at = List_Item_At(poke);
         REBLEN n = 0;
         for(n = 0; n < dimension; ++n, ++at) {
-            required (Set_Scalar_In_Struct(stu, field, n, at));
+            require (
+              Set_Scalar_In_Struct(stu, field, n, at)
+            );
         }
     }
 
@@ -1481,8 +1541,8 @@ IMPLEMENT_GENERIC(EQUAL_Q, Is_Struct)
 //
 StructInstance* Copy_Struct_Managed(StructInstance* src)
 {
-    StructInstance* copy = require (
-        nocast Prep_Stub(STUB_MASK_STRUCT, Alloc_Stub())
+    require (
+      StructInstance* copy = u_downcast Prep_Stub(STUB_MASK_STRUCT, Alloc_Stub())
     );
     Force_Erase_Cell(Stub_Cell(copy));
 
@@ -1614,8 +1674,9 @@ DECLARE_NATIVE(MAKE_SIMILAR_STRUCT)
 
     Init_Struct(OUT, Copy_Struct_Managed(Cell_Struct(spec)));
 
-    required (Init_Struct_Fields(OUT, body));
-
+    require (
+      Init_Struct_Fields(OUT, body)
+    );
     return OUT;
 }
 
