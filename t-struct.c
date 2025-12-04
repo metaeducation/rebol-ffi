@@ -48,7 +48,7 @@ static void cleanup_ffi_type(void* p, size_t length) {
 //    pointer is being referenced again by the child struct we give back.
 //
 static Result(None) Get_Scalar_In_Struct(
-    Sink(Value) out,  // if EXT_SYM_REBVAL, could be any value
+    Sink(Stable) out,  // if EXT_SYM_REBVAL, could be any value
     StructInstance* stu,
     StructField* field,
     REBLEN n  // element index, starting from 0
@@ -119,7 +119,7 @@ static Result(None) Get_Scalar_In_Struct(
         break;
 
       case EXT_SYM_REBVAL:
-        Copy_Cell(out, cast(const Value*, p));
+        Copy_Cell(out, cast(const Stable*, p));
         break;
 
       default:
@@ -163,7 +163,7 @@ Result(Source*) Struct_To_Array(StructInstance* stu)
             );
             Init_Word(cell, EXT_CANON(STRUCT_X));
 
-            DECLARE_VALUE (nested);
+            DECLARE_STABLE (nested);
             require (
               Get_Scalar_In_Struct(nested, stu, field, 0)
             );
@@ -214,7 +214,7 @@ Result(Source*) Struct_To_Array(StructInstance* stu)
 
             REBLEN n;
             for (n = 0; n < dimension; n ++) {
-                DECLARE_VALUE (scalar);
+                DECLARE_STABLE (scalar);
                 require (
                   Get_Scalar_In_Struct(scalar, stu, field, n)
                 );
@@ -228,7 +228,7 @@ Result(Source*) Struct_To_Array(StructInstance* stu)
             Init_Block(cell, init);
         }
         else {
-            DECLARE_VALUE (scalar);
+            DECLARE_STABLE (scalar);
             require (
               Get_Scalar_In_Struct(scalar, stu, field, 0)
             );
@@ -326,7 +326,7 @@ static Result(None) Set_Scalar_In_Struct_core(
     REBLEN offset,
     StructField* field,
     REBLEN n,
-    const Value* val
+    const Stable* val
 ){
     assert(n == 0 or Field_Is_C_Array(field));
 
@@ -449,10 +449,10 @@ static Result(None) Set_Scalar_In_Struct_core(
         //
         // !!! This is a dangerous thing to be doing in generic structs, but
         // for the main purpose of cells (tunneling) it should be okay so
-        // long as the Value* that is passed in is actually a pointer into
+        // long as the Stable* that is passed in is actually a pointer into
         // a frame's args.
         //
-        *cast(const Value**, data) = val;
+        *cast(const Stable**, data) = val;
         break;
 
       default:
@@ -468,7 +468,7 @@ Result(None) Set_Scalar_In_Struct(
     StructInstance* stu,
     StructField* field,
     REBLEN n,
-    const Value* val
+    const Stable* val
 ){
     return Set_Scalar_In_Struct_core(
         Struct_Data_Head(stu), STRUCT_OFFSET(stu), field, n, val
@@ -536,9 +536,8 @@ static Result(None) Parse_Struct_Attribute(
             if (warning)
                 panic (Cell_Error(warning));
 
-            Unquotify(Known_Element(result));
-            assert(Is_Handle(result));
-            CFunction* addr = Cell_Handle_Cfunc(result);
+            Element* handle = Unquotify(Known_Element(result));
+            CFunction* addr = Cell_Handle_Cfunc(handle);
             *raw_addr = i_cast(uintptr_t, addr);
             break; }
 
@@ -885,7 +884,9 @@ static Result(None) Parse_Field_Type(
         //
         DECLARE_ELEMENT (ret);
         Context* derived = Derive_Binding(List_Binding(spec), val);
-        if (Eval_Any_List_At_Throws(ret, val, derived))
+
+        Sink(Value) atom_ret = u_cast(Value*, ret);
+        if (Eval_Any_List_At_Throws(atom_ret, val, derived))
             panic (Error_No_Catch_For_Throw(TOP_LEVEL));
 
         require (
@@ -1217,7 +1218,7 @@ Result(Element*) Make_Struct(Sink(Element) out, const Element* arg)
             Derelativize(specific, at, Level_Binding(L));
 
             Push_Lifeguard(specific);
-            RebolValue* reduced = rebValue("reduce", specific);
+            Api(Stable*) reduced = rebStable("reduce", specific);
             Drop_Lifeguard(specific);
 
             Copy_Cell(init, Known_Element(reduced));
@@ -1227,8 +1228,9 @@ Result(Element*) Make_Struct(Sink(Element) out, const Element* arg)
             Corrupt_If_Needful(at);
         }
         else {
-            Erase_Cell(init);
-            if (Eval_Step_Throws(init, L))
+            Sink(Value) atom_init = u_cast(Value*, init);
+
+            if (Eval_Step_Throws(atom_init, L))
                 panic (Error_No_Catch_For_Throw(TOP_LEVEL));
 
             require (
@@ -1382,7 +1384,7 @@ IMPLEMENT_GENERIC(TWEAK_P, Is_Struct)
     INCLUDE_PARAMS_OF_TWEAK_P;
 
     Element* location = Element_ARG(LOCATION);
-    Value* picker = ARG(PICKER);
+    Stable* picker = ARG(PICKER);
 
     if (not Is_Word(picker))
         panic (PARAM(PICKER));
@@ -1394,7 +1396,7 @@ IMPLEMENT_GENERIC(TWEAK_P, Is_Struct)
     Element* fields_tail = Array_Tail(fieldlist);
     Element* fields_item = Array_Head(fieldlist);
 
-    Value* dual = ARG(DUAL);
+    Stable* dual = ARG(DUAL);
     if (Not_Lifted(dual)) {
         if (Is_Dual_Nulled_Pick_Signal(dual))
             goto handle_pick;
@@ -1434,7 +1436,7 @@ IMPLEMENT_GENERIC(TWEAK_P, Is_Struct)
         Set_Flex_Len(arr, dimension);
         REBLEN n;
         for (n = 0; n < dimension; ++n) {
-            DECLARE_VALUE (scalar);
+            DECLARE_STABLE (scalar);
             require (
               Get_Scalar_In_Struct(scalar, stu, field, n)
             );
@@ -1569,7 +1571,7 @@ IMPLEMENT_GENERIC(OLDGENERIC, Is_Struct)
 
     switch (opt Symbol_Id(verb)) {
       case SYM_CHANGE: {
-        Value* arg = ARG_N(2);
+        Stable* arg = ARG_N(2);
         if (not Is_Blob(arg))
             panic (Error_Unexpected_Type(TYPE_BLOB, Datatype_Of(arg)));
 
@@ -1596,7 +1598,7 @@ IMPLEMENT_GENERIC(LENGTH_OF, Is_Struct)
 {
     INCLUDE_PARAMS_OF_LENGTH_OF;
 
-    Element* elem = Element_ARG(ELEMENT);
+    Element* elem = Element_ARG(VALUE);
     return Init_Integer(OUT, Cell_Struct_Data_Size(elem));
 }
 
@@ -1633,7 +1635,7 @@ IMPLEMENT_GENERIC(ADDRESS_OF, Is_Struct)
 {
     INCLUDE_PARAMS_OF_ADDRESS_OF;
 
-    Value* v = Element_ARG(ELEMENT);
+    Stable* v = Element_ARG(VALUE);
 
     return Init_Integer(OUT, i_cast(intptr_t, Cell_Struct_Data_At(v)));
 }

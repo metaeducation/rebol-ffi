@@ -166,7 +166,7 @@ enum {
 };
 
 #define Field_Detail(a,n) \
-    Flex_At(Value, (a), (n))  // locate index access
+    Flex_At(Stable, (a), (n))  // locate index access
 
 INLINE Option(const Symbol*) Field_Name(StructField* f) {
     if (Is_Space(Field_Detail(f, IDX_FIELD_NAME)))

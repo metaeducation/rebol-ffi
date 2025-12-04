@@ -81,7 +81,7 @@ static struct {
 //    on Windows.  We could detect the FFI version, but since basically
 //    no one uses anything but the default punt on it for now.
 //
-static ffi_abi Abi_From_Word_Or_Nulled(const Value* word) {
+static ffi_abi Abi_From_Word_Or_Nulled(const Stable* word) {
     if (Is_Nulled(word))
         return FFI_DEFAULT_ABI;
 
@@ -290,7 +290,7 @@ INLINE static void* Expand_And_Align(
 static Result(Offset) Cell_To_Ffi(
     Binary* store,
     void *dest,
-    const Value* arg,
+    const Stable* arg,
     const Element* schema,
     Option(const Symbol*) label,
     const Key* key,  // may be RETURN (not actually a named argument)
@@ -591,7 +591,7 @@ static Result(Offset) Cell_To_Ffi(
 // Convert a C value into a Rebol value.  Reverse of Cell_To_Ffi().
 //
 static Result(None) Ffi_To_Cell(
-    Sink(Value) out,
+    Sink(Stable) out,
     const Element* schema,
     void* ffi_rvalue
 ){
@@ -679,7 +679,7 @@ static Result(None) Ffi_To_Cell(
         break;
 
       case EXT_SYM_REBVAL:
-        Copy_Cell(out, *cast(const Value**, ffi_rvalue));
+        Copy_Cell(out, *cast(const Stable**, ffi_rvalue));
         break;
 
       case SYM_VOID:
@@ -756,7 +756,7 @@ Bounce Routine_Dispatcher(Level* const L)
     assert(Phase_Num_Params(phase) == num_fixed + 1);  // +1 for `...`
     UNUSED(phase);
 
-    Value* vararg = Known_Stable(Level_Arg(L, num_fixed + 1));  // 1-based
+    Stable* vararg = Known_Stable(Level_Arg(L, num_fixed + 1));  // 1-based
     assert(Is_Varargs(vararg));
 
     do {
@@ -848,7 +848,7 @@ Bounce Routine_Dispatcher(Level* const L)
     for (; i < num_fixed; ++i) {
         const Param* param = Phase_Param(Level_Phase(L), i + 1);  // 1-based
         const Key* key = Varlist_Key(Level_Varlist(L), i + 1);  // 1-based
-        const Value* arg = Known_Stable(Level_Arg(L, i + 1));  // 1-based
+        const Stable* arg = Known_Stable(Level_Arg(L, i + 1));  // 1-based
         const Element* schema = Routine_Arg_Schema(r, i);  // 0-based
 
         require (
@@ -921,7 +921,7 @@ Bounce Routine_Dispatcher(Level* const L)
               Offset offset = Cell_To_Ffi(
                 store,  // data appended to store
                 nullptr,  // dest pointer must be null if store is non-null
-                Data_Stack_At(Value, dsp),  // arg
+                Data_Stack_At(Stable, dsp),  // arg
                 schema,
                 Level_Label(L),
                 key,  // REVIEW: need key for error messages
@@ -1016,7 +1016,7 @@ Bounce Routine_Dispatcher(Level* const L)
 //  Routine_Details_Querier: C
 //
 bool Routine_Details_Querier(
-    Sink(Value) out,
+    Sink(Stable) out,
     Details* details,
     SymId property
 ){
@@ -1119,7 +1119,7 @@ void callback_dispatcher(  // client C code calls this, not the trampoline
 
     REBLEN i;
     for (i = 0; i != cif->nargs; ++i, ++elem) {
-        DECLARE_VALUE (value);
+        DECLARE_STABLE (value);
         require (
           Ffi_To_Cell(value, Routine_Arg_Schema(r, i), args[i])
         );
@@ -1172,7 +1172,7 @@ void callback_dispatcher(  // client C code calls this, not the trampoline
         Offset offset = Cell_To_Ffi(
             nullptr,  // store must be null if dest is non-null,
             ret,  // destination pointer
-            cast(Value*, result),
+            cast(Stable*, result),
             unwrap ret_schema,
             label,
             &spelling,  // parameter used for symbol in error only
@@ -1448,8 +1448,8 @@ DECLARE_NATIVE(MAKE_ROUTINE)
 
     Element* spec = Element_ARG(FFI_SPEC);
 
-    RebolValue* handle;
-    RebolValue* warning = rebRescue2(&handle, "pick", ARG(LIB), ARG(NAME));
+    Api(Value*) value;
+    Api(Value*) warning = rebRescue2(&value, "pick", ARG(LIB), ARG(NAME));
     if (warning)  // PICK returned ERROR!, Rescue made WARNING!
         panic (Cell_Error(warning));
 
@@ -1463,7 +1463,7 @@ DECLARE_NATIVE(MAKE_ROUTINE)
     );
 
     Copy_Cell(Routine_At(r, IDX_ROUTINE_CFUNC), handle);
-    rebRelease(handle);
+    rebRelease(value);
 
     Init_Space(Routine_At(r, IDX_ROUTINE_CLOSURE));
     Copy_Cell(Routine_At(r, IDX_ROUTINE_ORIGIN), ARG(LIB));

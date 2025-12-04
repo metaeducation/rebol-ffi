@@ -122,7 +122,7 @@ INLINE Option(Element*) Routine_Lib(RoutineDetails* r) {
     return Known_Element(Routine_At(r, IDX_ROUTINE_ORIGIN));
 }
 
-INLINE Value* Routine_Callback_Action(RoutineDetails* r) {
+INLINE Stable* Routine_Callback_Action(RoutineDetails* r) {
     assert(Is_Routine_Callback(r));
     return Routine_At(r, IDX_ROUTINE_ORIGIN);
 }
@@ -140,7 +140,7 @@ INLINE Element* Routine_Arg_Schema(
     RoutineDetails* r,
     Offset offset  // 0-based
 ){
-    Value* arg_schemas = Routine_At(r, IDX_ROUTINE_ARG_SCHEMAS);
+    Stable* arg_schemas = Routine_At(r, IDX_ROUTINE_ARG_SCHEMAS);
     return Array_At(Cell_Array_Known_Mutable(arg_schemas), offset);
 }
 
@@ -185,12 +185,12 @@ INLINE ffi_type** Routine_Arg_Ffi_Types(RoutineDetails* r) {
 extern Bounce Routine_Dispatcher(Level *L);
 
 extern bool Routine_Details_Querier(
-    Sink(Value) out,
+    Sink(Stable) out,
     Details* details,
     SymId property
 );
 
-INLINE bool Is_Action_Routine(const Value* v) {
+INLINE bool Is_Action_Routine(const Stable* v) {
     Phase* phase = Frame_Phase(v);
 
     if (not Is_Stub_Details(phase))

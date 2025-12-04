@@ -132,7 +132,7 @@ DECLARE_NATIVE(SET_AT_POINTER)
 {
     INCLUDE_PARAMS_OF_SET_AT_POINTER;
 
-    Value* v = ARG(VALUE);
+    Stable* v = ARG(VALUE);
 
     if (Is_Trash(v) and not Bool_ARG(ANY)) {
         // !!! current philosophy is to allow all assignments
