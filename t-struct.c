@@ -267,7 +267,7 @@ IMPLEMENT_GENERIC(MOLDIFY, Is_Struct)
 
     End_Non_Lexical_Mold(mo);
 
-    return TRIPWIRE;
+    return TRASH;
 }
 
 
@@ -1716,5 +1716,5 @@ DECLARE_NATIVE(DESTROY_STRUCT_STORAGE)
     if (Bool_ARG(FREE))
         rebElide(rebRUN(ARG(FREE)), pointer);  // may not be routine [1]
 
-    return TRIPWIRE;
+    return TRASH;
 }

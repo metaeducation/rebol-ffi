@@ -59,7 +59,7 @@ DECLARE_NATIVE(ALLOC_VALUE_POINTER)
 //
 //  "Free a cell that was allocated by ALLOC-VALUE-POINTER"
 //
-//      return: []
+//      return: ~
 //      pointer [integer!]
 //  ]
 //
@@ -79,7 +79,7 @@ DECLARE_NATIVE(FREE_VALUE_POINTER)
 
     rebRelease(cell);  // unmanaged [1]
 
-    return TRIPWIRE;
+    return TRASH;
 }
 
 
@@ -150,7 +150,7 @@ DECLARE_NATIVE(SET_AT_POINTER)
 //
 //  "Startup FFI Extension"
 //
-//      return: []
+//      return: ~
 //  ]
 //
 DECLARE_NATIVE(STARTUP_P)
@@ -159,7 +159,7 @@ DECLARE_NATIVE(STARTUP_P)
 
     Register_Dispatcher(&Routine_Dispatcher, &Routine_Details_Querier);
 
-    return TRIPWIRE;
+    return TRASH;
 }
 
 
@@ -168,12 +168,12 @@ DECLARE_NATIVE(STARTUP_P)
 //
 //  "Shutdown FFI Extensions"
 //
-//      return: []
+//      return: ~
 //  ]
 //
 DECLARE_NATIVE(SHUTDOWN_P)
 {
     INCLUDE_PARAMS_OF_SHUTDOWN_P;
 
-    return TRIPWIRE;
+    return TRASH;
 }
