@@ -53,7 +53,7 @@ static struct {
     {EXT_SYM_FLOAT, "decimal!"},
     {EXT_SYM_DOUBLE, "decimal!"},
     {EXT_SYM_POINTER, "null? integer! text! blob! vector! action!"},  // [1]
-    {EXT_SYM_REBVAL, "any-value?"},
+    {EXT_SYM_REBVAL, "any-stable?"},
     {SYM_0, 0}
 };
 
@@ -1207,7 +1207,7 @@ void callback_dispatcher(  // client C code calls this, not the trampoline
 //     arg2 [type3] "note"
 //     ...
 //     argn [typen] "note"
-//     return: [type] "note"
+//     return: [type]
 // ]
 //
 Result(RoutineDetails*) Alloc_Ffi_Action_For_Spec(

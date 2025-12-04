@@ -35,7 +35,7 @@ ffi-type-mappings: [
     ;
     pointer [integer! text! binary! vector! action!]
 
-    rebval [any-value?]
+    rebval [any-stable?]
 
     ; ...struct...
 ]
@@ -77,7 +77,7 @@ export make-callback: function [
     args [block!]
     body [block!]
     :fallback "If untrapped panic occurs during callback, return value"
-        [any-value?]
+        [any-stable?]
 ][
     let r-args: copy []
 

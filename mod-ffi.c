@@ -37,7 +37,7 @@
 //
 //      return: [integer!]
 //      value "Initial value for the cell"
-//          [any-value?]
+//          [any-stable?]
 //  ]
 //
 DECLARE_NATIVE(ALLOC_VALUE_POINTER)
@@ -88,7 +88,7 @@ DECLARE_NATIVE(FREE_VALUE_POINTER)
 //
 //  "Get the contents of a cell, e.g. one returned by ALLOC-VALUE-POINTER"
 //
-//      return: [any-value?]
+//      return: [any-stable?]
 //      source "A pointer to a Rebol value"
 //          [integer!]
 //  ]
@@ -117,12 +117,11 @@ DECLARE_NATIVE(GET_AT_POINTER)
 //
 //  "Set the contents of a cell, e.g. one returned by ALLOC-VALUE-POINTER"
 //
-//      return: "The value that was set to"
-//          [any-value?]
-//      target "A pointer to a Rebol value"
+//      return: [any-stable?]
+//      target "A pointer to a Rebol value (Cell*)"
 //          [integer!]
-//      value "Value to assign"
-//          [any-value?]
+//      value "Value to assign, will be same as return value"
+//          [any-stable?]
 //      :any "Do not error on TRASH!"
 //  ]
 //
