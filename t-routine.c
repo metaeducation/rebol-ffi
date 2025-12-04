@@ -501,7 +501,7 @@ static Result(Offset) Cell_To_Ffi(
                     "Only callback functions may be passed by FFI pointer"
                 );
 
-            RoutineDetails* r = Ensure_Cell_Frame_Details(arg);
+            RoutineDetails* r = Ensure_Frame_Details(arg);
             CFunction* cfunc = Routine_C_Function(r);
             size_t sizeof_cfunc = sizeof(cfunc);  // avoid conditional const
             if (sizeof_cfunc != sizeof(intptr_t))  // not necessarily true
