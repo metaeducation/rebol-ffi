@@ -47,7 +47,7 @@ static void cleanup_ffi_type(void* p, size_t length) {
 //    depending on whether the data is owned by Rebol or not.  That series
 //    pointer is being referenced again by the child struct we give back.
 //
-static Result(Zero) Get_Scalar_In_Struct(
+static Result(None) Get_Scalar_In_Struct(
     Sink(Value) out,  // if EXT_SYM_REBVAL, could be any value
     StructInstance* stu,
     StructField* field,
@@ -68,7 +68,7 @@ static Result(Zero) Get_Scalar_In_Struct(
         STRUCT_OFFSET(sub_stu) = offset;
         assert(Struct_Total_Size(sub_stu) == Field_Width(field));
         Init_Struct(out, sub_stu);
-        return zero;
+        return none;
     }
 
     Byte* p = offset + Struct_Data_Head(stu);
@@ -127,7 +127,7 @@ static Result(Zero) Get_Scalar_In_Struct(
         panic ("Unknown FFI type indicator");
     }
 
-    return zero;
+    return none;
 }
 
 
@@ -293,7 +293,7 @@ static bool Same_Fields(const Array* a_fieldlist, const Array* b_fieldlist)
 }
 
 
-static Result(Zero) Set_Scalar_In_Struct_core(
+static Result(None) Set_Scalar_In_Struct_core(
     Byte* data_head,
     REBLEN offset,
     StructField* field,
@@ -321,7 +321,7 @@ static Result(Zero) Set_Scalar_In_Struct_core(
 
         memcpy(data, Cell_Struct_Data_At(val), Field_Width(field));
 
-        return zero;
+        return none;
     }
 
     // All other types take numbers
@@ -329,7 +329,7 @@ static Result(Zero) Set_Scalar_In_Struct_core(
     int64_t i;
     double d;
 
-    switch (maybe Type_Of(val)) {
+    switch (opt Type_Of(val)) {
       case TYPE_DECIMAL:
         d = VAL_DECIMAL(val);
         i = cast(int64_t, d);
@@ -432,11 +432,11 @@ static Result(Zero) Set_Scalar_In_Struct_core(
         panic ("unknown Field_Type_Id()");
     }
 
-    return zero;
+    return none;
 }
 
 
-Result(Zero) Set_Scalar_In_Struct(
+Result(None) Set_Scalar_In_Struct(
     StructInstance* stu,
     StructField* field,
     REBLEN n,
@@ -448,7 +448,7 @@ Result(Zero) Set_Scalar_In_Struct(
 }
 
 
-static Result(Zero) Parse_Struct_Attribute(
+static Result(None) Parse_Struct_Attribute(
     const Element* block,
     REBINT *raw_size,
     uintptr_t *raw_addr
@@ -463,7 +463,7 @@ static Result(Zero) Parse_Struct_Attribute(
         if (not Is_Set_Word(attr))
             panic (attr);
 
-        switch (maybe Word_Id(attr)) {
+        switch (opt Word_Id(attr)) {
           case EXT_SYM_RAW_SIZE:
             ++attr;
             if (attr == tail or not Is_Integer(attr))
@@ -532,7 +532,7 @@ static Result(Zero) Parse_Struct_Attribute(
         ++attr;
     }
 
-    return zero;
+    return none;
 }
 
 
@@ -555,7 +555,7 @@ static void cleanup_noop(void* p, size_t length) {
 // external pointer.  This uses a managed HANDLE! for the same purpose, as
 // a less invasive way of doing the same thing.
 //
-static Result(Zero) Set_Struct_Storage_External(
+static Result(None) Set_Struct_Storage_External(
     StructInstance* stu,
     REBLEN len,
     REBINT raw_size,
@@ -574,7 +574,7 @@ static Result(Zero) Set_Struct_Storage_External(
         &cleanup_noop
     );
 
-    return zero;
+    return none;
 }
 
 
@@ -622,7 +622,7 @@ static void Prepare_Field_For_Ffi(StructField* schema)
     ffi_type* fftype;
 
     if (not Field_Is_Struct(schema)) {
-        fftype = maybe Get_Ffi_Type_For_Symbol(Field_Type_Id(schema));
+        fftype = opt Get_Ffi_Type_For_Symbol(Field_Type_Id(schema));
         assert(fftype != nullptr);
 
         // The FFType pointers returned by Get_Ffi_Type_For_Symbol should not be
@@ -687,7 +687,7 @@ static void Prepare_Field_For_Ffi(StructField* schema)
 // will actually be creating a new `inner` STRUCT! value.  Since this value
 // is managed and not referred to elsewhere, there can't be evaluations.
 //
-static Result(Zero) Parse_Field_Type(
+static Result(None) Parse_Field_Type(
     StructField* field,
     const Element* spec,
     Sink(Element) inner  // will be set only if STRUCT!
@@ -706,7 +706,7 @@ static Result(Zero) Parse_Field_Type(
         //
         Copy_Cell(Field_Detail(field, IDX_FIELD_TYPE), val);
 
-        switch (maybe id) {
+        switch (opt id) {
           case EXT_SYM_UINT8:
             Init_Integer(Field_Detail(field, IDX_FIELD_WIDE), 1);
             Prepare_Field_For_Ffi(field);
@@ -867,14 +867,14 @@ static Result(Zero) Parse_Field_Type(
     else
         panic (Error_Invalid_Type_Raw(Datatype_Of(val)));
 
-    return zero;
+    return none;
 }
 
 
 // a: make struct! [uint 8 i: 1]
 // b: make a [i: 10]
 //
-Result(Zero) Init_Struct_Fields(
+Result(None) Init_Struct_Fields(
     Sink(Element) ret,
     const Element* spec
 ){
@@ -972,7 +972,7 @@ Result(Zero) Init_Struct_Fields(
         spec_item += 2;
     }
 
-    return zero;
+    return none;
 }
 
 
@@ -1142,7 +1142,7 @@ Result(Element*) Make_Struct(Sink(Element) out, const Element* arg)
     REBLEN dimension = Field_Is_C_Array(field) ? Field_Dimension(field) : 1;
 
     if (Field_Width(field) > UINT32_MAX)
-        panic (Error_Size_Limit_Raw(maybe Field_Name(field)));
+        panic (Error_Size_Limit_Raw(opt Field_Name(field)));
 
     if (dimension > UINT32_MAX) {
         DECLARE_ELEMENT (dim);
@@ -1507,7 +1507,7 @@ IMPLEMENT_GENERIC(OLDGENERIC, Is_Struct)
     Element* val = Known_Element(ARG_N(1));
     const Symbol* verb = Level_Verb(LEVEL);
 
-    switch (maybe Symbol_Id(verb)) {
+    switch (opt Symbol_Id(verb)) {
       case SYM_CHANGE: {
         Value* arg = ARG_N(2);
         if (not Is_Blob(arg))

@@ -144,7 +144,7 @@ static ffi_abi Abi_From_Word_Or_Nulled(const Value* word) {
 // Writes into `schema_out` a Rebol value which describes either a basic FFI
 // type or the layout of a STRUCT! (not including data).
 //
-static Result(Zero) Make_Schema_From_Block(
+static Result(None) Make_Schema_From_Block(
     Sink(Element) schema_out,  // => INTEGER! or HANDLE! for struct
     Option(Sink(Element)) param_out,  // => parameter for use in ACTION!s
     const Element* block,
@@ -192,7 +192,7 @@ static Result(Zero) Make_Schema_From_Block(
             );
             // TBD: constrain with STRUCT!
         }
-        return zero;
+        return none;
     }
 
     if (Is_Struct(item)) {
@@ -204,7 +204,7 @@ static Result(Zero) Make_Schema_From_Block(
             );
             // TBD: constrain with STRUCT!
         }
-        return zero;
+        return none;
     }
 
     if (Series_Len_At(block) != 1)
@@ -242,7 +242,7 @@ static Result(Zero) Make_Schema_From_Block(
         }
     }
 
-    return zero;
+    return none;
 }
 
 
@@ -373,7 +373,7 @@ static Result(Offset) Cell_To_Ffi(
     char *data;
     Size size;
 
-    switch (maybe Word_Id(schema)) {
+    switch (opt Word_Id(schema)) {
       case EXT_SYM_UINT8: {
         if (not arg)
             buffer.u8 = 0;  // return value, make space (but initialize)
@@ -477,7 +477,7 @@ static Result(Offset) Cell_To_Ffi(
         else if (Is_Nulled(arg)) {
             buffer.ipt = 0;
         }
-        else switch (maybe Type_Of(arg)) {
+        else switch (opt Type_Of(arg)) {
           case TYPE_INTEGER:
             buffer.ipt = VAL_INT64(arg);
             break;
@@ -587,7 +587,7 @@ static Result(Offset) Cell_To_Ffi(
 
 // Convert a C value into a Rebol value.  Reverse of Cell_To_Ffi().
 //
-static Result(Zero) Ffi_To_Cell(
+static Result(None) Ffi_To_Cell(
     Sink(Value) out,
     const Element* schema,
     void* ffi_rvalue
@@ -623,12 +623,12 @@ static Result(Zero) Ffi_To_Cell(
         Init_Blob(Stub_Cell(stu), data);
 
         assert(Struct_Data_Head(stu) == Binary_Head(data));
-        return zero;
+        return none;
     }
 
     assert(Is_Word(schema));
 
-    switch (maybe Word_Id(schema)) {
+    switch (opt Word_Id(schema)) {
       case EXT_SYM_UINT8:
         Init_Integer(out, *cast(uint8_t*, ffi_rvalue));
         break;
@@ -690,7 +690,7 @@ static Result(Zero) Ffi_To_Cell(
         panic ("Unknown FFI type indicator");
     }
 
-    return zero;
+    return none;
 }
 
 
