@@ -253,7 +253,7 @@ IMPLEMENT_GENERIC(MOLDIFY, Is_Struct)
 
     Element* cell = Element_ARG(VALUE);
     Molder* mo = Cell_Handle_Pointer(Molder, ARG(MOLDER));
-    bool form = Bool_ARG(FORM);
+    bool form = did ARG(FORM);
 
     UNUSED(form); // no difference between MOLD and FORM at this time
 
@@ -1041,7 +1041,7 @@ Result(Element*) Make_Struct(Sink(Element) out, const Element* arg)
     );
     const Element* at = At_Level(L);
 
-    DECLARE_ATOM (eval);
+    DECLARE_VALUE (eval);
     Push_Level_Erase_Out_If_State_0(eval, L);
 
     REBINT max_fields = 16;
@@ -1519,7 +1519,7 @@ IMPLEMENT_GENERIC(EQUAL_Q, Is_Struct)
 
     Element* a = Element_ARG(VALUE1);
     Element* b = Element_ARG(VALUE2);
-    UNUSED(Bool_ARG(RELAX));
+    UNUSED(ARG(RELAX));
 
     if (Cell_Struct_Fields_Array(a) != Cell_Struct_Fields_Array(b))
         return LOGIC(false);
@@ -1688,7 +1688,7 @@ DECLARE_NATIVE(MAKE_SIMILAR_STRUCT)
 //
 //  "Destroy the external memory associated the struct"
 //
-//      return: []
+//      return: ~
 //      struct [struct!]
 //      :free "Specify the function to free the memory"
 //          [action!]  ; [1]
@@ -1715,8 +1715,8 @@ DECLARE_NATIVE(DESTROY_STRUCT_STORAGE)
 
     CELL_HANDLE_LENGTH_U(handle) = 0;  // !!! assert correct for mem block size
 
-    if (Bool_ARG(FREE))
-        rebElide(rebRUN(ARG(FREE)), pointer);  // may not be routine [1]
+    if (ARG(FREE))
+        rebElide(rebRUN(unwrap ARG(FREE)), pointer);  // may not be routine [1]
 
     return TRASH;
 }

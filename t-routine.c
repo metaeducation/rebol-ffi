@@ -81,10 +81,11 @@ static struct {
 //    on Windows.  We could detect the FFI version, but since basically
 //    no one uses anything but the default punt on it for now.
 //
-static ffi_abi Abi_From_Word_Or_Nulled(const Stable* word) {
-    if (Is_Nulled(word))
+static ffi_abi Abi_From_Argument(Option(const Stable*) arg) {
+    if (not arg)
         return FFI_DEFAULT_ABI;
 
+    const Stable* word = unwrap arg;
     assert(Is_Word(word));
 
     intptr_t abi_int = rebUnboxInteger_c89(  // _c89 -> no macro, ifdef [1]
@@ -996,7 +997,7 @@ Bounce Routine_Dispatcher(Level* const L)
         );
     }
     else
-        Init_Tripwire(OUT);  // !!! Is ~ antiform best return result for void?
+        Init_Labeled_Trash(OUT, CANON(VOID));  // ~#[void]#~ trash for C void
 
     if (num_args != 0)
         Free_Unmanaged_Flex(arg_offsets);
@@ -1132,7 +1133,7 @@ void callback_dispatcher(  // client C code calls this, not the trampoline
     DECLARE_ELEMENT (code);
     Init_Block(code, arr);
 
-    DECLARE_ATOM (result);
+    DECLARE_VALUE (result);
 
   RECOVER_SCOPE_CLOBBERS_ABOVE_LOCALS_IF_MODIFIED {
 
@@ -1444,7 +1445,7 @@ DECLARE_NATIVE(MAKE_ROUTINE)
 {
     INCLUDE_PARAMS_OF_MAKE_ROUTINE;
 
-    ffi_abi abi = Abi_From_Word_Or_Nulled(ARG(ABI));
+    ffi_abi abi = Abi_From_Argument(ARG(ABI));
 
     Element* spec = Element_ARG(FFI_SPEC);
 
@@ -1493,7 +1494,7 @@ DECLARE_NATIVE(MAKE_ROUTINE_RAW)
 {
     INCLUDE_PARAMS_OF_MAKE_ROUTINE_RAW;
 
-    ffi_abi abi = Abi_From_Word_Or_Nulled(ARG(ABI));
+    ffi_abi abi = Abi_From_Argument(ARG(ABI));
 
     Element* spec = Element_ARG(FFI_SPEC);
 
@@ -1537,7 +1538,7 @@ DECLARE_NATIVE(WRAP_CALLBACK)
 {
     INCLUDE_PARAMS_OF_WRAP_CALLBACK;
 
-    ffi_abi abi = Abi_From_Word_Or_Nulled(ARG(ABI));
+    ffi_abi abi = Abi_From_Argument(ARG(ABI));
 
     Element* spec = Element_ARG(FFI_SPEC);
 

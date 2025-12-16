@@ -134,7 +134,7 @@ DECLARE_NATIVE(SET_AT_POINTER)
 
     Stable* v = ARG(VALUE);
 
-    if (Is_Trash(v) and not Bool_ARG(ANY)) {
+    if (Is_Trash(v) and not ARG(ANY)) {
         // !!! current philosophy is to allow all assignments
     }
 
