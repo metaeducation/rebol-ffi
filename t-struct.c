@@ -118,9 +118,13 @@ static Result(None) Get_Scalar_In_Struct(
         Init_Integer(out, i_cast(intptr_t, *cast(void**, p)));
         break;
 
-      case EXT_SYM_REBVAL:
-        Copy_Cell(out, cast(const Stable*, p));
-        break;
+      case EXT_SYM_REBVAL: {
+        Value* undecayed = cast(Value*, p);  // can store unstable Value*
+        require (
+          Stable* stable = Decay_If_Unstable(undecayed)
+        );
+        Copy_Cell(out, stable);
+        break; }
 
       default:
         assert(false);
@@ -1365,7 +1369,7 @@ IMPLEMENT_GENERIC(MAKE, Is_Struct)
 {
     INCLUDE_PARAMS_OF_MAKE;
 
-    UNUSED(ARG(TYPE));
+    UNUSED(PARAM(TYPE));
 
     Element* arg = Element_ARG(DEF);
 
@@ -1519,7 +1523,7 @@ IMPLEMENT_GENERIC(EQUAL_Q, Is_Struct)
 
     Element* a = Element_ARG(VALUE1);
     Element* b = Element_ARG(VALUE2);
-    UNUSED(ARG(RELAX));
+    UNUSED(PARAM(RELAX));
 
     if (Cell_Struct_Fields_Array(a) != Cell_Struct_Fields_Array(b))
         return LOGIC(false);
