@@ -769,7 +769,7 @@ Bounce Routine_Dispatcher(Level* const L)
             return THROWN;
         }
 
-        if (Is_Ghost(OUT))
+        if (Is_Void(OUT))
             break;
 
         require (
