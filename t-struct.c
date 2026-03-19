@@ -1655,7 +1655,7 @@ IMPLEMENT_GENERIC(ADDRESS_OF, Is_Struct)
 
 
 //
-//  export make-similar-struct: native [
+//  export /make-similar-struct: native [
 //
 //  "Create a STRUCT! that reuses the underlying spec of another STRUCT!"
 //
@@ -1688,7 +1688,7 @@ DECLARE_NATIVE(MAKE_SIMILAR_STRUCT)
 
 
 //
-//  export destroy-struct-storage: native [
+//  export /destroy-struct-storage: native [
 //
 //  "Destroy the external memory associated the struct"
 //

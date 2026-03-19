@@ -1426,7 +1426,7 @@ Result(RoutineDetails*) Alloc_Ffi_Action_For_Spec(
 
 
 //
-//  export make-routine: native [
+//  export /make-routine: native [
 //
 //  "Create a bridge for interfacing with arbitrary C code in a DLL"
 //
@@ -1474,7 +1474,7 @@ DECLARE_NATIVE(MAKE_ROUTINE)
 
 
 //
-//  export make-routine-raw: native [
+//  export /make-routine-raw: native [
 //
 //  "Create a bridge for interfacing with a C function, by pointer"
 //
@@ -1517,7 +1517,7 @@ DECLARE_NATIVE(MAKE_ROUTINE_RAW)
 
 
 //
-//  export wrap-callback: native [
+//  export /wrap-callback: native [
 //
 //  "Wrap an ACTION! so it can be called by raw C code via a memory address"
 //

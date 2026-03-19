@@ -70,7 +70,7 @@ ffi-type-mappings: [
 ; (At time of writing it does not map the types, it just creates the function
 ; with no types, e.g. (function [a b] [...]), but that's easy enough.)
 ;
-export make-callback: function [
+export /make-callback: function [
     "Helper for WRAP-CALLBACK that auto-generates the action to be wrapped"
 
     return: [action!]

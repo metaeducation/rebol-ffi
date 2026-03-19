@@ -31,7 +31,7 @@
 
 
 //
-//  export alloc-value-pointer: native [
+//  export /alloc-value-pointer: native [
 //
 //  "Persistently allocate a cell that can be referenced from FFI routines"
 //
@@ -55,7 +55,7 @@ DECLARE_NATIVE(ALLOC_VALUE_POINTER)
 
 
 //
-//  export free-value-pointer: native [
+//  export /free-value-pointer: native [
 //
 //  "Free a cell that was allocated by ALLOC-VALUE-POINTER"
 //
@@ -84,7 +84,7 @@ DECLARE_NATIVE(FREE_VALUE_POINTER)
 
 
 //
-//  export get-at-pointer: native [
+//  export /get-at-pointer: native [
 //
 //  "Get the contents of a cell, e.g. one returned by ALLOC-VALUE-POINTER"
 //
@@ -113,7 +113,7 @@ DECLARE_NATIVE(GET_AT_POINTER)
 
 
 //
-//  export set-at-pointer: native [
+//  export /set-at-pointer: native [
 //
 //  "Set the contents of a cell, e.g. one returned by ALLOC-VALUE-POINTER"
 //
@@ -146,7 +146,7 @@ DECLARE_NATIVE(SET_AT_POINTER)
 
 
 //
-//  startup*: native [
+//  /startup*: native [
 //
 //  "Startup FFI Extension"
 //
@@ -164,7 +164,7 @@ DECLARE_NATIVE(STARTUP_P)
 
 
 //
-//  shutdown*: native [
+//  /shutdown*: native [
 //
 //  "Shutdown FFI Extensions"
 //
