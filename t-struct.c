@@ -1695,7 +1695,7 @@ DECLARE_NATIVE(MAKE_SIMILAR_STRUCT)
 //      return: [trash!]
 //      struct [struct!]
 //      :free "Specify the function to free the memory"
-//          [action!]  ; [1]
+//          [frame!]  ; [1]
 //  ]
 //
 DECLARE_NATIVE(DESTROY_STRUCT_STORAGE)

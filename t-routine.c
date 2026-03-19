@@ -1129,8 +1129,7 @@ void callback_dispatcher(  // client C code calls this, not the trampoline
 
     Source* arr = Make_Source(1 + cif->nargs);
     Element* elem = Array_Head(arr);
-    Copy_Lifted_Cell(elem, Routine_Callback_Action(r));
-    LIFT_BYTE(elem) = NOQUOTE_2;
+    Copy_Plain_Cell(elem, Routine_Callback_Action(r));
     assert(Is_Frame(elem));
 
     ++elem;
@@ -1539,7 +1538,7 @@ DECLARE_NATIVE(MAKE_ROUTINE_RAW)
 //  "Wrap an ACTION! so it can be called by raw C code via a memory address"
 //
 //      return: [action!]
-//      action "The existing Rebol action whose behavior is being wrapped"
+//      ^action "The existing Rebol action whose behavior is being wrapped"
 //          [action!]
 //      ffi-spec "What C types each Rebol argument should map to"
 //          [block!]
@@ -1596,7 +1595,7 @@ DECLARE_NATIVE(WRAP_CALLBACK)
         sizeof(&closure),
         &cleanup_ffi_closure
     );
-    Copy_Cell(Routine_At(r, IDX_ROUTINE_ORIGIN), ARG(ACTION));
-
+    Copy_Plain_Cell(Routine_At(r, IDX_ROUTINE_ORIGIN), ARG(ACTION));
+    
     return Init_Action(OUT, r, ANONYMOUS, UNCOUPLED);
 }

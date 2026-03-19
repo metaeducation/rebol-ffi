@@ -168,10 +168,10 @@ g-signal-connect-data:
 g-signal-connect: func [
     instance [integer!]
     detailed-signal [integer! text! binary!]
-    c-handler [action!]
+    c-handler [frame!]
     data [<void> integer!]
 ][
-    g-signal-connect-data instance detailed-signal c-handler/ data 0 0
+    g-signal-connect-data instance detailed-signal c-handler :data 0 0
 ]
 
 gtk-button-new-with-label:
