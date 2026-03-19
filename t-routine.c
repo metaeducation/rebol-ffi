@@ -1042,7 +1042,8 @@ bool Routine_Details_Querier(
 
     switch (property) {
       case SYM_RETURN_OF: {
-        Extract_Paramlist_Returner(out, Phase_Paramlist(details), SYM_RETURN);
+        ParamList* paramlist = Phase_Paramlist(details);
+        Extract_Returnlike_Parameter(out, paramlist, SYM_RETURN);
         return true; }
 
       case SYM_BODY_OF: {
@@ -1054,10 +1055,11 @@ bool Routine_Details_Querier(
     //    the wrapped DLL function if it's an ordinary routine
 
       case SYM_ADDRESS_OF:
-        return Init_Integer(
+        Init_Integer(
             out,
             p_cast(intptr_t, Routine_C_Function(r))  // fabricated/wrapped [1]
         );
+        return true;
 
       default:
         break;
