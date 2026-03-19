@@ -72,7 +72,7 @@ static struct {
 //    the plain non-macro call and add rebEND and LIBREBOL_SPECIFIER manually.
 //    Hence we use the rebUnboxInteger_c89() variant.
 //
-//    (It also means we can't use u_cast(ffi_abi, xxx) because u_cast is
+//    (It also means we can't use i_cast(ffi_abi, xxx) because i_cast is
 //    also a macro.  Could use old-style (ffi_abi) cast... but religion
 //    dictates avoiding that, and instead casting as a separate step.)
 //
@@ -137,7 +137,7 @@ static ffi_abi Abi_From_Argument(Option(const Stable*) arg) {
       rebEND  // <-- rebEND required, rebUnboxInteger_c89() is not a macro
     );
 
-    return u_cast(ffi_abi, abi_int);
+    return i_cast(ffi_abi, abi_int);
 }
 
 
@@ -382,7 +382,7 @@ static Result(Offset) Cell_To_Ffi(
         if (not arg)
             buffer.u8 = 0;  // return value, make space (but initialize)
         else if (Is_Integer(arg))
-            buffer.u8 = cast(uint8_t, VAL_INT64(arg));
+            buffer.u8 = i_cast(uint8_t, VAL_INT64(arg));
         else
             panic (Error_Arg_Type(label, key, param, arg));
 
@@ -394,7 +394,7 @@ static Result(Offset) Cell_To_Ffi(
         if (not arg)
             buffer.i8 = 0;  // return value, make space (but initialize)
         else if (Is_Integer(arg))
-            buffer.i8 = cast(int8_t, VAL_INT64(arg));
+            buffer.i8 = i_cast(int8_t, VAL_INT64(arg));
         else
             panic (Error_Arg_Type(label, key, param, arg));
 
@@ -406,7 +406,7 @@ static Result(Offset) Cell_To_Ffi(
         if (not arg)
             buffer.u16 = 0;  // return value, make space (but initialize)
         else if (Is_Integer(arg))
-            buffer.u16 = cast(uint16_t, VAL_INT64(arg));
+            buffer.u16 = i_cast(uint16_t, VAL_INT64(arg));
         else
             panic (Error_Arg_Type(label, key, param, arg));
 
@@ -418,7 +418,7 @@ static Result(Offset) Cell_To_Ffi(
         if (not arg)
             buffer.i16 = 0;  // return value, make space (but initialize)
         else if (Is_Integer(arg))
-            buffer.i16 = cast(int16_t, VAL_INT64(arg));
+            buffer.i16 = i_cast(int16_t, VAL_INT64(arg));
         else
             panic (Error_Arg_Type(label, key, param, arg));
 
@@ -430,7 +430,7 @@ static Result(Offset) Cell_To_Ffi(
         if (not arg)
             buffer.u32 = 0;  // return value, make space (but initialize)
         else if (Is_Integer(arg))
-            buffer.u32 = cast(int32_t, VAL_INT64(arg));
+            buffer.u32 = i_cast(int32_t, VAL_INT64(arg));
         else
             panic (Error_Arg_Type(label, key, param, arg));
 
@@ -442,7 +442,7 @@ static Result(Offset) Cell_To_Ffi(
         if (not arg)
             buffer.i32 = 0;  // return value, make space (but initialize)
         else if (Is_Integer(arg))
-            buffer.i32 = cast(int32_t, VAL_INT64(arg));
+            buffer.i32 = i_cast(int32_t, VAL_INT64(arg));
         else
             panic (Error_Arg_Type(label, key, param, arg));
 
@@ -475,7 +475,7 @@ static Result(Offset) Cell_To_Ffi(
                 panic(
                     "VECTOR! is only extension type FFI accepts by pointer"
                 );
-            buffer.ipt = cast(intptr_t, rebUnboxInteger("address-of", arg));
+            buffer.ipt = i_cast(intptr_t, rebUnboxInteger("address-of", arg));
             size = sizeof(buffer.ipt);
         }
         else if (Is_Nulled(arg)) {
@@ -492,11 +492,11 @@ static Result(Offset) Cell_To_Ffi(
         // GC compaction even if not changed)...so the memory is not "stable".
         //
           case TYPE_TEXT:  // !!! copies a *pointer*!
-            buffer.ipt = i_cast(intptr_t, u_cast(Byte*, Cell_Utf8_At(arg)));
+            buffer.ipt = p_cast(intptr_t, cast(Byte*, Cell_Utf8_At(arg)));
             break;
 
           case TYPE_BLOB:  // !!! copies a *pointer*!
-            buffer.ipt = i_cast(intptr_t, Cell_Bytes_At(nullptr, arg));
+            buffer.ipt = p_cast(intptr_t, Cell_Bytes_At(nullptr, arg));
             break;
 
           case TYPE_ACTION: {
@@ -525,7 +525,7 @@ static Result(Offset) Cell_To_Ffi(
         if (not arg)
             buffer.ipt = 0xDECAFBAD;  // return value, make space (but init)
         else
-            buffer.ipt = i_cast(intptr_t, arg);
+            buffer.ipt = p_cast(intptr_t, arg);
 
         data = cast(char*, &buffer.ipt);
         size = sizeof(buffer.ipt);
@@ -668,7 +668,7 @@ static Result(None) Ffi_To_Cell(
         break;
 
       case EXT_SYM_POINTER:  // !!! Should 0 come back as a NULL to Rebol?
-        Init_Integer(out, i_cast(uintptr_t, *cast(void**, ffi_rvalue)));
+        Init_Integer(out, p_cast(uintptr_t, *cast(void**, ffi_rvalue)));
         break;
 
       case EXT_SYM_FLOAT:
@@ -962,13 +962,13 @@ Bounce Routine_Dispatcher(Level* const L)
     // data won't be relocated)
 
     if (Routine_Return_Schema_Unless_Void(r))
-        ret_offset = Flex_Data(store) + i_cast(Offset, ret_offset);
+        ret_offset = Flex_Data(store) + p_cast(Offset, ret_offset);
     else
         ret_offset = nullptr;  // void return, no associated storage
 
     REBLEN i;
     for (i = 0; i < num_args; ++i) {
-        Offset off = i_cast(Offset, *Flex_At(void*, arg_offsets, i));
+        Offset off = p_cast(Offset, *Flex_At(void*, arg_offsets, i));
         assert(off == 0 or off < Binary_Len(store));
         *Flex_At(void*, arg_offsets, i) = Binary_At(store, off);
     }
@@ -1039,7 +1039,7 @@ bool Routine_Details_Querier(
       case SYM_ADDRESS_OF:
         return Init_Integer(
             out,
-            i_cast(intptr_t, Routine_C_Function(r))  // fabricated/wrapped [1]
+            p_cast(intptr_t, Routine_C_Function(r))  // fabricated/wrapped [1]
         );
 
       default:
@@ -1499,7 +1499,7 @@ DECLARE_NATIVE(MAKE_ROUTINE_RAW)
     Element* spec = Element_ARG(FFI_SPEC);
 
     CFunction* cfunc = p_cast(CFunction*,  // can't directly cast on 32-bit
-        cast(uintptr_t, VAL_INT64(ARG(POINTER))
+        i_cast(uintptr_t, VAL_INT64(ARG(POINTER))
     ));
     if (cfunc == nullptr)
         panic ("FFI: nullptr pointer not allowed for raw MAKE-ROUTINE");

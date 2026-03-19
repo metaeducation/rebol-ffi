@@ -50,7 +50,7 @@ DECLARE_NATIVE(ALLOC_VALUE_POINTER)
     Value* allocated = Copy_Cell(Alloc_Value(), ARG(VALUE));
     rebUnmanage(allocated);
 
-    return Init_Integer(OUT, i_cast(intptr_t, allocated));
+    return Init_Integer(OUT, p_cast(intptr_t, allocated));
 }
 
 
@@ -75,7 +75,7 @@ DECLARE_NATIVE(FREE_VALUE_POINTER)
 {
     INCLUDE_PARAMS_OF_FREE_VALUE_POINTER;
 
-    Value* cell = p_cast(Value*, cast(intptr_t, VAL_INT64(ARG(POINTER))));
+    Value* cell = p_cast(Value*, i_cast(intptr_t, VAL_INT64(ARG(POINTER))));
 
     rebRelease(cell);  // unmanaged [1]
 
@@ -105,7 +105,7 @@ DECLARE_NATIVE(GET_AT_POINTER)
 {
     INCLUDE_PARAMS_OF_GET_AT_POINTER;
 
-    Value* source = p_cast(Value*, cast(intptr_t, VAL_INT64(ARG(SOURCE))));
+    Value* source = p_cast(Value*, i_cast(intptr_t, VAL_INT64(ARG(SOURCE))));
 
     Copy_Cell(OUT, source);
     return OUT;  // don't return `source` (would do a rebRelease())
@@ -138,7 +138,7 @@ DECLARE_NATIVE(SET_AT_POINTER)
         // !!! current philosophy is to allow all assignments
     }
 
-    Value* target = p_cast(Value*, cast(intptr_t, VAL_INT64(ARG(TARGET))));
+    Value* target = p_cast(Value*, i_cast(intptr_t, VAL_INT64(ARG(TARGET))));
     Copy_Cell(target, v);
 
     return COPY(v);  // Returning target would rebRelease() it

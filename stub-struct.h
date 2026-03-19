@@ -320,7 +320,7 @@ INLINE StructInstance* Cell_Struct(const Cell* cell) {
         assert(Is_Handle(data));
         if (Cell_Handle_Len(data) == 0) {  // inaccessible data
             DECLARE_ELEMENT (i);
-            Init_Integer(i, i_cast(intptr_t, Struct_Data_Head(stu)));
+            Init_Integer(i, p_cast(intptr_t, Struct_Data_Head(stu)));
             panic (Error_Bad_Memory_Raw(i, i));  // !!! Can't pass stu?
         }
     }

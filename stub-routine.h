@@ -98,7 +98,7 @@ INLINE CFunction* Routine_C_Function(RoutineDetails* r)
   { return Cell_Handle_Cfunc(Routine_At(r, IDX_ROUTINE_CFUNC)); }
 
 INLINE ffi_abi Routine_Abi(RoutineDetails* r)
-  { return cast(ffi_abi, VAL_INT32(Routine_At(r, IDX_ROUTINE_ABI))); }
+  { return i_cast(ffi_abi, VAL_INT32(Routine_At(r, IDX_ROUTINE_ABI))); }
 
 INLINE bool Is_Routine_Callback(RoutineDetails* r) {
     if (Is_Action(Routine_At(r, IDX_ROUTINE_ORIGIN)))

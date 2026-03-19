@@ -115,7 +115,7 @@ static Result(None) Get_Scalar_In_Struct(
         break;
 
       case EXT_SYM_POINTER:  // !!! Should 0 come back as a NULL to Rebol?
-        Init_Integer(out, i_cast(intptr_t, *cast(void**, p)));
+        Init_Integer(out, p_cast(intptr_t, *cast(void**, p)));
         break;
 
       case EXT_SYM_REBVAL: {
@@ -241,7 +241,7 @@ Result(Source*) Struct_To_Array(StructInstance* stu)
             require (
               Sink(Element) cell = Alloc_Tail_Array(typespec)
             );
-            Copy_Cell(cell, Known_Element(scalar));
+            Copy_Cell(cell, cast(Element*, scalar));
         }
 
         Init_Block(PUSH(), typespec); // required type
@@ -364,12 +364,12 @@ static Result(None) Set_Scalar_In_Struct_core(
     switch (opt Type_Of(val)) {
       case TYPE_DECIMAL:
         d = VAL_DECIMAL(val);
-        i = cast(int64_t, d);
+        i = u_cast(int64_t, d);
         break;
 
       case TYPE_INTEGER:
         i = VAL_INT64(val);
-        d = cast(double, i);
+        d = u_cast(double, i);
         break;
 
       default:
@@ -391,37 +391,37 @@ static Result(None) Set_Scalar_In_Struct_core(
       case EXT_SYM_INT8:
         if (i > 0x7f or i < -128)
             panic (Error_Overflow_Raw());
-        *cast(int8_t*, data) = cast(int8_t, i);
+        *cast(int8_t*, data) = i_cast(int8_t, i);
         break;
 
       case EXT_SYM_UINT8:
         if (i > 0xff or i < 0)
             panic (Error_Overflow_Raw());
-        *cast(uint8_t*, data) = cast(uint8_t, i);
+        *cast(uint8_t*, data) = i_cast(uint8_t, i);
         break;
 
       case EXT_SYM_INT16:
         if (i > 0x7fff or i < -0x8000)
             panic (Error_Overflow_Raw());
-        *cast(int16_t*, data) = cast(int16_t, i);
+        *cast(int16_t*, data) = i_cast(int16_t, i);
         break;
 
       case EXT_SYM_UINT16:
         if (i > 0xffff or i < 0)
             panic (Error_Overflow_Raw());
-        *cast(uint16_t*, data) = cast(uint16_t, i);
+        *cast(uint16_t*, data) = i_cast(uint16_t, i);
         break;
 
       case EXT_SYM_INT32:
         if (i > INT32_MAX or i < INT32_MIN)
             panic (Error_Overflow_Raw());
-        *cast(int32_t*, data) = cast(int32_t, i);
+        *cast(int32_t*, data) = i_cast(int32_t, i);
         break;
 
       case EXT_SYM_UINT32:
         if (i > UINT32_MAX or i < 0)
             panic (Error_Overflow_Raw());
-        *cast(uint32_t*, data) = cast(uint32_t, i);
+        *cast(uint32_t*, data) = i_cast(uint32_t, i);
         break;
 
       case EXT_SYM_INT64:
@@ -431,11 +431,11 @@ static Result(None) Set_Scalar_In_Struct_core(
       case EXT_SYM_UINT64:
         if (i < 0)
             panic (Error_Overflow_Raw());
-        *cast(uint64_t*, data) = cast(uint64_t, i);
+        *cast(uint64_t*, data) = i_cast(uint64_t, i);
         break;
 
       case EXT_SYM_FLOAT:
-        *cast(float*, data) = cast(float, d);
+        *cast(float*, data) = u_cast(float, d);
         break;
 
       case EXT_SYM_DOUBLE:
@@ -446,7 +446,7 @@ static Result(None) Set_Scalar_In_Struct_core(
         size_t sizeof_void_ptr = sizeof(void*); // avoid constant conditional
         if (sizeof_void_ptr == 4 and i > UINT32_MAX)
             panic (Error_Overflow_Raw());
-        *cast(void**, data) = p_cast(void*, cast(intptr_t, i));
+        *cast(void**, data) = p_cast(void*, i_cast(intptr_t, i));
         break; }
 
       case EXT_SYM_REBVAL:
@@ -513,7 +513,7 @@ static Result(None) Parse_Struct_Attribute(
                 panic (attr);
             if (*raw_addr != 0)
                 panic ("FFI: duplicate raw memory");
-            *raw_addr = cast(REBU64, VAL_INT64(attr));
+            *raw_addr = i_cast(REBU64, VAL_INT64(attr));
             if (*raw_addr == 0)
                 panic ("FFI: void pointer illegal for raw memory");
             break;
@@ -542,7 +542,7 @@ static Result(None) Parse_Struct_Attribute(
 
             Element* handle = Unquotify(Known_Element(result));
             CFunction* addr = Cell_Handle_Cfunc(handle);
-            *raw_addr = i_cast(uintptr_t, addr);
+            *raw_addr = p_cast(uintptr_t, addr);
             break; }
 
         // !!! This alignment code was commented out for some reason.
@@ -982,8 +982,8 @@ Result(None) Init_Struct_Fields(
                     }
                 }
                 else if (Is_Integer(fld_val)) { // interpret as a data pointer
-                    void *ptr = p_cast(void *,
-                        cast(intptr_t, VAL_INT64(fld_val))
+                    void *ptr = p_cast(void*,
+                        i_cast(intptr_t, VAL_INT64(fld_val))
                     );
 
                     // assuming valid pointer to enough space
@@ -1244,11 +1244,11 @@ Result(Element*) Make_Struct(Sink(Element) out, const Element* arg)
 
         if (Field_Is_C_Array(field)) {
             if (Is_Integer(init)) {  // interpreted as a C pointer
-                void *ptr = p_cast(void*, cast(intptr_t, VAL_INT64(init)));
+                void *ptr = p_cast(void*, i_cast(intptr_t, VAL_INT64(init)));
 
                 // assume valid pointer to enough space
                 memcpy(
-                    Flex_At(Byte, data_bin, cast(REBLEN, offset)),
+                    Flex_At(Byte, data_bin, i_cast(Index, offset)),
                     ptr,
                     Field_Total_Size(field)
                 );
@@ -1641,7 +1641,7 @@ IMPLEMENT_GENERIC(ADDRESS_OF, Is_Struct)
 
     Stable* v = Element_ARG(VALUE);
 
-    return Init_Integer(OUT, i_cast(intptr_t, Cell_Struct_Data_At(v)));
+    return Init_Integer(OUT, p_cast(intptr_t, Cell_Struct_Data_At(v)));
 }
 
 
@@ -1712,7 +1712,7 @@ DECLARE_NATIVE(DESTROY_STRUCT_STORAGE)
     Element* handle = Struct_Storage(Cell_Struct(ARG(STRUCT)));
 
     DECLARE_ELEMENT (pointer);
-    Init_Integer(pointer, i_cast(intptr_t, Cell_Handle_Pointer(void, handle)));
+    Init_Integer(pointer, p_cast(intptr_t, Cell_Handle_Pointer(void, handle)));
 
     if (Cell_Handle_Len(handle) == 0)
         panic ("DESTROY-STRUCT-STORAGE given already destroyed handle");
