@@ -119,7 +119,7 @@ INLINE Option(Element*) Routine_Lib(RoutineDetails* r) {
     assert(not Is_Routine_Callback(r));
     if (Is_Space(Routine_At(r, IDX_ROUTINE_ORIGIN)))
         return nullptr;
-    return Known_Element(Routine_At(r, IDX_ROUTINE_ORIGIN));
+    return cast(Element*, Routine_At(r, IDX_ROUTINE_ORIGIN));
 }
 
 INLINE Stable* Routine_Callback_Action(RoutineDetails* r) {
@@ -130,7 +130,7 @@ INLINE Stable* Routine_Callback_Action(RoutineDetails* r) {
 INLINE Option(Element*) Routine_Return_Schema_Unless_Void(RoutineDetails* r) {
     if (Is_Space(Routine_At(r, IDX_ROUTINE_RET_SCHEMA)))
         return nullptr;
-    return Known_Element(Routine_At(r, IDX_ROUTINE_RET_SCHEMA));
+    return cast(Element*, Routine_At(r, IDX_ROUTINE_RET_SCHEMA));
 }
 
 INLINE Count Routine_Num_Fixed_Args(RoutineDetails* r)

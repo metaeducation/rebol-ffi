@@ -757,7 +757,9 @@ Bounce Routine_Dispatcher(Level* const L)
     assert(Phase_Num_Params(phase) == num_fixed + 1);  // +1 for `...`
     UNUSED(phase);
 
-    Stable* vararg = Known_Stable(Level_Arg(L, num_fixed + 1));  // 1-based
+    Stable* vararg = As_Stable(
+        Required_Arg_Of_Level(L, num_fixed + 1)  // 1-based
+    );
     assert(Is_Varargs(vararg));
 
     do {
@@ -849,7 +851,9 @@ Bounce Routine_Dispatcher(Level* const L)
     for (; i < num_fixed; ++i) {
         const Param* param = Phase_Param(Level_Phase(L), i + 1);  // 1-based
         const Key* key = Varlist_Key(Level_Varlist(L), i + 1);  // 1-based
-        const Stable* arg = Known_Stable(Level_Arg(L, i + 1));  // 1-based
+        const Stable* arg = As_Stable(
+            Required_Arg_Of_Level(L, i + 1)  // 1-based
+        );
         const Element* schema = Routine_Arg_Schema(r, i);  // 0-based
 
         require (

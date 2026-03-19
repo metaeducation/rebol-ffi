@@ -540,7 +540,7 @@ static Result(None) Parse_Struct_Attribute(
             if (error)
                 panic (error);
 
-            Element* handle = Unquotify(Known_Element(result));
+            Element* handle = Unquote_Quoted_Cell(cast(Element*, result));
             CFunction* addr = Cell_Handle_Cfunc(handle);
             *raw_addr = p_cast(uintptr_t, addr);
             break; }
@@ -1225,7 +1225,7 @@ Result(Element*) Make_Struct(Sink(Element) out, const Element* arg)
             Api(Stable*) reduced = rebStable("reduce", specific);
             Drop_Lifeguard(specific);
 
-            Copy_Cell(init, Known_Element(reduced));
+            Copy_Cell(init, cast(Element*, reduced));
             rebRelease(reduced);
 
             Fetch_Next_In_Feed(L->feed);
@@ -1446,7 +1446,7 @@ IMPLEMENT_GENERIC(TWEAK_P, Is_Struct)
             );
             if (Is_Antiform(scalar))
                 panic ("Antiforms can't be put in block for PICK");
-            Copy_Cell(Array_At(arr, n), Known_Element(scalar));
+            Copy_Cell(Array_At(arr, n), cast(Element*, scalar));
         }
 
         return DUAL_LIFTED(Init_Block(OUT, arr));
@@ -1461,7 +1461,7 @@ IMPLEMENT_GENERIC(TWEAK_P, Is_Struct)
     if (Is_Antiform(dual))
         panic (Error_Bad_Antiform(dual));
 
-    Element* poke = Known_Element(dual);
+    Element* poke = cast(Element*, dual);
 
     for (; fields_item != fields_tail; ++fields_item) {
         StructField* field = Cell_Array_Known_Mutable(fields_item);
@@ -1570,7 +1570,7 @@ StructInstance* Copy_Struct_Managed(StructInstance* src)
 
 IMPLEMENT_GENERIC(OLDGENERIC, Is_Struct)
 {
-    Element* val = Known_Element(ARG_N(1));
+    Element* val = cast(Element*, ARG_N(1));
     const Symbol* verb = Level_Verb(LEVEL);
 
     switch (opt Symbol_Id(verb)) {
