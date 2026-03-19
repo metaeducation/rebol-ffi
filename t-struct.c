@@ -799,7 +799,7 @@ static Result(None) Parse_Field_Type(
                 panic (Error_Unexpected_Type(TYPE_BLOCK, Datatype_Of(val)));
 
             DECLARE_ELEMENT (specific);
-            Derelativize(specific, val, List_Binding(spec));
+            Copy_Cell_May_Bind(specific, val, List_Binding(spec));
 
             Push_Lifeguard(specific);
             require (
@@ -870,7 +870,7 @@ static Result(None) Parse_Field_Type(
             Field_Detail(field, IDX_FIELD_FFTYPE),
             Field_Detail(Cell_Struct_Schema(val), IDX_FIELD_FFTYPE)
         );
-        Derelativize(inner, val, List_Binding(spec));
+        Copy_Cell_May_Bind(inner, val, List_Binding(spec));
     }
     else
         panic (Error_Invalid_Type_Raw(Datatype_Of(val)));
@@ -1099,7 +1099,7 @@ Result(Element*) Make_Struct(Sink(Element) out, const Element* arg)
 
     if (Is_Block(at)) {  // leading block? [1]
         DECLARE_ELEMENT (specific);
-        Derelativize(specific, at, List_Binding(arg));
+        Copy_Cell_May_Bind(specific, at, List_Binding(arg));
 
         require (
           Parse_Struct_Attribute(
@@ -1177,7 +1177,7 @@ Result(Element*) Make_Struct(Sink(Element) out, const Element* arg)
     if (not Is_Block(at))
         panic (Error_Bad_Value(at));
 
-    Derelativize(spec, at, List_Binding(arg));
+    Copy_Cell_May_Bind(spec, at, List_Binding(arg));
 
     // Fills in the width, dimension, type, and ffi_type (if needed)
     //
@@ -1219,7 +1219,7 @@ Result(Element*) Make_Struct(Sink(Element) out, const Element* arg)
 
         if (Is_Block(at)) {
             DECLARE_ELEMENT (specific);
-            Derelativize(specific, at, Level_Binding(L));
+            Copy_Cell_May_Bind(specific, at, Level_Binding(L));
 
             Push_Lifeguard(specific);
             Api(Stable*) reduced = rebStable("reduce", specific);

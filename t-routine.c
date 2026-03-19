@@ -174,7 +174,7 @@ static Result(None) Make_Schema_From_Block(
         // Use the block spec to build a temporary structure through the same
         // machinery that implements `make struct! [...]`
 
-        Derelativize(def, item, List_Binding(block));
+        Copy_Cell_May_Bind(def, item, List_Binding(block));
 
         require (
           Make_Struct(temp, def)
@@ -1263,7 +1263,7 @@ Result(RoutineDetails*) Alloc_Ffi_Action_For_Spec(
             ++item;
 
             DECLARE_ELEMENT (block);
-            Derelativize(block, item, List_Binding(ffi_spec));
+            Copy_Cell_May_Bind(block, item, List_Binding(ffi_spec));
 
             require (
               Make_Schema_From_Block(
@@ -1304,7 +1304,7 @@ Result(RoutineDetails*) Alloc_Ffi_Action_For_Spec(
                 ++item;
 
                 DECLARE_ELEMENT (block);
-                Derelativize(block, item, List_Binding(ffi_spec));
+                Copy_Cell_May_Bind(block, item, List_Binding(ffi_spec));
 
                 Init_Word(PUSH(), name);
                 require (
