@@ -17,7 +17,7 @@ Rebol [
 ]
 
 ffi-type-mappings: [
-    void [<opt>]
+    void [<void>]
 
     uint8 [integer!]
     int8 [integer!]

@@ -34,14 +34,27 @@
 // like a good thing to do in usermode, as what is actually needed here are
 // PARAMETER! definitions.  (MAKE PARAMETER! doesn't exist yet, but it could.)
 //
-// 1. ACTION! is legal if routine or callback.  Is Rebol's ~NULL~ sensible to
+// 1. At one time, Ren-C's VOID! (antiform BLANK!) meant "vanishing" behavior.
+//    This has been tamed to where a non-vanishable function returning a void!
+//    will be turned into a "heavy void" (empty pack) if it's in a situation
+//    where vanishing would be risky.  So void is returned by many common
+//    constructs, and using a VOID! result here is now safe.
+//
+//    However, VOID! displays in the console.  So if you call something like
+//    printf() via FFI, you won't get the console-quiet behavior you might
+//    expect from a function with a "meaningless" result (C's interpretation
+//    of `void`).  We *could* return a labeled TRASH! like ~<void>~... but
+//    the benefits are probably outweighed by fighting against the term.
+//    So we just use VOID! now.
+//
+// 2. ACTION! is legal if routine or callback.  Is Rebol's ~NULL~ sensible to
 //    pass as a nullptr?
 //
 static struct {
     Option(SymId) symid;
     const char* typespec;
 } syms_to_typesets[] = {
-    {SYM_VOID, "trash?"},  // TRASH is closest to C void (vs. Rebol VOID)
+    {SYM_VOID, "void!"},  // TRASH! may be "better", but why rock the boat [1]
     {EXT_SYM_UINT8, "integer!"},
     {EXT_SYM_INT8, "integer!"},
     {EXT_SYM_UINT16, "integer!"},
@@ -52,7 +65,7 @@ static struct {
     {EXT_SYM_INT64, "integer!"},
     {EXT_SYM_FLOAT, "decimal!"},
     {EXT_SYM_DOUBLE, "decimal!"},
-    {EXT_SYM_POINTER, "null? integer! text! blob! vector! action!"},  // [1]
+    {EXT_SYM_POINTER, "null? integer! text! blob! vector! action!"},  // [2]
     {EXT_SYM_REBVAL, "any-stable?"},
     {SYM_0, 0}
 };
@@ -1001,7 +1014,7 @@ Bounce Routine_Dispatcher(Level* const L)
         );
     }
     else
-        Init_Labeled_Trash(OUT, CANON(VOID));  // ~#[void]#~ trash for C void
+        Init_Void(OUT);
 
     if (num_args != 0)
         Free_Unmanaged_Flex(arg_offsets);
