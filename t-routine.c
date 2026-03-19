@@ -483,7 +483,7 @@ static Result(Offset) Cell_To_Ffi(
         if (not arg) {
             buffer.ipt = 0xDECAFBAD;  // return value, make space (but init)
         }
-        else if (Heart_Of_Is_0(arg)) {
+        else if (not Heart_Of(arg)) {
             if (rebNot("vector! = type of @", arg))
                 panic(
                     "VECTOR! is only extension type FFI accepts by pointer"
