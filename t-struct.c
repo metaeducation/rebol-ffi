@@ -1402,7 +1402,7 @@ IMPLEMENT_GENERIC(TWEAK_P, Is_Struct)
 
     Stable* dual = ARG(DUAL);
     if (Not_Lifted(dual)) {
-        if (Is_Dual_Nulled_Pick_Signal(dual))
+        if (Is_Null_Signifying_Tweak_Is_Pick(dual))
             goto handle_pick;
 
         panic (Error_Bad_Poke_Dual_Raw(dual));
@@ -1432,7 +1432,7 @@ IMPLEMENT_GENERIC(TWEAK_P, Is_Struct)
             require (
               Get_Scalar_In_Struct(OUT, stu, field, 0)  // index 0
             );
-            return DUAL_LIFTED(OUT);
+            return LIFT_OUT_FOR_DUAL_PICK;
         }
 
         REBLEN dimension = Field_Dimension(field);
@@ -1449,14 +1449,15 @@ IMPLEMENT_GENERIC(TWEAK_P, Is_Struct)
             Copy_Cell(Array_At(arr, n), cast(Element*, scalar));
         }
 
-        return DUAL_LIFTED(Init_Block(OUT, arr));
+        Init_Block(OUT, arr);
+        return LIFT_OUT_FOR_DUAL_PICK;
     }
 
-    return DUAL_SIGNAL_NULL_ABSENT;
+    return NULL_OUT_SLOT_UNAVAILABLE;
 
 } handle_poke: { /////////////////////////////////////////////////////////////
 
-    Unliftify_Known_Stable(dual);
+    Known_Stable_Unlift_Cell(dual);
 
     if (Is_Antiform(dual))
         panic (Error_Bad_Antiform(dual));
@@ -1473,7 +1474,7 @@ IMPLEMENT_GENERIC(TWEAK_P, Is_Struct)
             require (
               Set_Scalar_In_Struct(stu, field, 0, poke)
             );
-            return NO_WRITEBACK_NEEDED;
+            return OKAY_OUT_NO_WRITEBACK;
         }
 
         if (Is_Blob(poke)) {
@@ -1513,7 +1514,7 @@ IMPLEMENT_GENERIC(TWEAK_P, Is_Struct)
         }
     }
 
-    return NO_WRITEBACK_NEEDED;
+    return OKAY_OUT_NO_WRITEBACK;
 }}
 
 

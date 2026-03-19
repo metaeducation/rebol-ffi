@@ -491,7 +491,7 @@ static Result(Offset) Cell_To_Ffi(
             buffer.ipt = i_cast(intptr_t, rebUnboxInteger("address-of", arg));
             size = sizeof(buffer.ipt);
         }
-        else if (Is_Nulled(arg)) {
+        else if (Is_Null(arg)) {
             buffer.ipt = 0;
         }
         else switch (opt Type_Of(arg)) {
