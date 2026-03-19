@@ -130,11 +130,11 @@ export /make-callback: function [
             compose2:deep '{} inside body '[
                 sys.util/recover:relax [
                     return {as group! bindable body}
-                ] then error -> [
+                ] then (error -> [
                     print "** RESCUED CRITICAL ERROR DURING FFI CALLBACK:"
                     print mold error
                     return '{fallback}
-                ]
+                ])
             ]
         ] else [
             body
