@@ -1692,7 +1692,7 @@ DECLARE_NATIVE(MAKE_SIMILAR_STRUCT)
 //
 //  "Destroy the external memory associated the struct"
 //
-//      return: ~
+//      return: [trash!]
 //      struct [struct!]
 //      :free "Specify the function to free the memory"
 //          [action!]  ; [1]

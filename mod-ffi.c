@@ -59,7 +59,7 @@ DECLARE_NATIVE(ALLOC_VALUE_POINTER)
 //
 //  "Free a cell that was allocated by ALLOC-VALUE-POINTER"
 //
-//      return: ~
+//      return: [trash!]
 //      pointer [integer!]
 //  ]
 //
@@ -150,7 +150,7 @@ DECLARE_NATIVE(SET_AT_POINTER)
 //
 //  "Startup FFI Extension"
 //
-//      return: ~
+//      return: [trash!]
 //  ]
 //
 DECLARE_NATIVE(STARTUP_P)
@@ -168,7 +168,7 @@ DECLARE_NATIVE(STARTUP_P)
 //
 //  "Shutdown FFI Extensions"
 //
-//      return: ~
+//      return: [trash!]
 //  ]
 //
 DECLARE_NATIVE(SHUTDOWN_P)
