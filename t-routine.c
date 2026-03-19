@@ -1026,7 +1026,7 @@ Bounce Routine_Dispatcher(Level* const L)
         rebFree(args_fftypes);
     }
 
-    return OUT;  // Note: cannot "throw" a Rebol value across an FFI boundary.
+    return BOUNCE_OUT;  // Note: cannot "throw" a Rebol value across an FFI boundary.
 }}
 
 
@@ -1488,7 +1488,8 @@ DECLARE_NATIVE(MAKE_ROUTINE)
     Init_Space(Routine_At(r, IDX_ROUTINE_CLOSURE));
     Copy_Cell(Routine_At(r, IDX_ROUTINE_ORIGIN), ARG(LIB));
 
-    return Init_Action(OUT, r, ANONYMOUS, UNCOUPLED);
+    Init_Action(OUT, r, ANONYMOUS, UNCOUPLED);
+    return BOUNCE_OUT;
 }
 
 
@@ -1531,7 +1532,8 @@ DECLARE_NATIVE(MAKE_ROUTINE_RAW)
     Init_Space(Routine_At(r, IDX_ROUTINE_CLOSURE));
     Init_Space(Routine_At(r, IDX_ROUTINE_ORIGIN)); // no LIBRARY! in this case.
 
-    return Init_Action(OUT, r, ANONYMOUS, UNCOUPLED);
+    Init_Action(OUT, r, ANONYMOUS, UNCOUPLED);
+    return BOUNCE_OUT;
 }
 
 
@@ -1599,6 +1601,7 @@ DECLARE_NATIVE(WRAP_CALLBACK)
         &cleanup_ffi_closure
     );
     Copy_Plain_Cell(Routine_At(r, IDX_ROUTINE_ORIGIN), ARG(ACTION));
-    
-    return Init_Action(OUT, r, ANONYMOUS, UNCOUPLED);
+
+    Init_Action(OUT, r, ANONYMOUS, UNCOUPLED);
+    return BOUNCE_OUT;
 }

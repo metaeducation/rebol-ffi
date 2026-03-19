@@ -50,7 +50,8 @@ DECLARE_NATIVE(ALLOC_VALUE_POINTER)
     Value* allocated = Copy_Cell(Alloc_Value(), ARG(VALUE));
     rebUnmanage(allocated);
 
-    return Init_Integer(OUT, p_cast(intptr_t, allocated));
+    Init_Integer(OUT, p_cast(intptr_t, allocated));
+    return BOUNCE_OUT;
 }
 
 
@@ -79,7 +80,7 @@ DECLARE_NATIVE(FREE_VALUE_POINTER)
 
     rebRelease(cell);  // unmanaged [1]
 
-    return TRASH;
+    return TRASH_OUT;
 }
 
 
@@ -108,7 +109,7 @@ DECLARE_NATIVE(GET_AT_POINTER)
     Value* source = p_cast(Value*, i_cast(intptr_t, VAL_INT64(ARG(SOURCE))));
 
     Copy_Cell(OUT, source);
-    return OUT;  // don't return `source` (would do a rebRelease())
+    return BOUNCE_OUT;  // don't return `source` (would do a rebRelease())
 }
 
 
@@ -136,7 +137,7 @@ DECLARE_NATIVE(SET_AT_POINTER)
     Value* target = p_cast(Value*, i_cast(intptr_t, VAL_INT64(ARG(TARGET))));
     Copy_Cell(target, v);
 
-    return COPY(v);  // Returning target would rebRelease() it
+    return COPY_TO_OUT(v);  // Returning target would rebRelease() it
 }
 
 
@@ -154,7 +155,7 @@ DECLARE_NATIVE(STARTUP_P)
 
     Register_Dispatcher(&Routine_Dispatcher, &Routine_Details_Querier);
 
-    return TRASH;
+    return TRASH_OUT;
 }
 
 
@@ -170,5 +171,5 @@ DECLARE_NATIVE(SHUTDOWN_P)
 {
     INCLUDE_PARAMS_OF_SHUTDOWN_P;
 
-    return TRASH;
+    return TRASH_OUT;
 }

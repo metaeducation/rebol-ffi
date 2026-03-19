@@ -271,7 +271,7 @@ IMPLEMENT_GENERIC(MOLDIFY, Is_Struct)
 
     End_Non_Lexical_Mold(mo);
 
-    return TRASH;
+    return TRASH_OUT;
 }
 
 
@@ -1139,7 +1139,7 @@ Result(Element*) Make_Struct(Sink(Element) out, const Element* arg)
     //    evaluator, you need to protect or not manage the Stubs you create.
     //
     //    (The right answer here isn't to upgrade this code to a state machine
-    //    that uses BOUNCE_CONTINUE and is properly stackless...but rather to
+    //    using Bounce_Continue() that's properly stackless...but rather to
     //    have all the evaluations and validations of the spec done in usermode
     //    so this code is doing a very minimal amount of work.)
 
@@ -1378,7 +1378,7 @@ IMPLEMENT_GENERIC(MAKE, Is_Struct)
     require (
       Make_Struct(OUT, arg)
     );
-    return OUT;
+    return BOUNCE_OUT;
 }
 
 
@@ -1526,12 +1526,12 @@ IMPLEMENT_GENERIC(EQUAL_Q, Is_Struct)
     UNUSED(PARAM(RELAX));
 
     if (Cell_Struct_Fields_Array(a) != Cell_Struct_Fields_Array(b))
-        return LOGIC(false);
+        return LOGIC_OUT(false);
 
     assert(Cell_Struct_Total_Size(a) == Cell_Struct_Total_Size(b));
     assert(Same_Fields(Cell_Struct_Fields_Array(a), Cell_Struct_Fields_Array(b)));
 
-    return LOGIC(memcmp(
+    return LOGIC_OUT(memcmp(
         Cell_Struct_Data_Head(a),
         Cell_Struct_Data_Head(b),
         Cell_Struct_Total_Size(a)
@@ -1588,7 +1588,7 @@ IMPLEMENT_GENERIC(OLDGENERIC, Is_Struct)
             Cell_Struct_Data_Size(val)
         );
         Copy_Cell(OUT, val);
-        return OUT; }
+        return BOUNCE_OUT; }
 
       default:
         break;
@@ -1603,7 +1603,8 @@ IMPLEMENT_GENERIC(LENGTH_OF, Is_Struct)
     INCLUDE_PARAMS_OF_LENGTH_OF;
 
     Element* elem = Element_ARG(VALUE);
-    return Init_Integer(OUT, Cell_Struct_Data_Size(elem));
+    Init_Integer(OUT, Cell_Struct_Data_Size(elem));
+    return BOUNCE_OUT;
 }
 
 
@@ -1621,7 +1622,8 @@ IMPLEMENT_GENERIC(BYTES_OF, Is_Struct)
     );
     Term_Binary_Len(bin, Cell_Struct_Total_Size(val));
 
-    return Init_Blob(OUT, bin);
+    Init_Blob(OUT, bin);
+    return BOUNCE_OUT;
 }
 
 
@@ -1641,7 +1643,8 @@ IMPLEMENT_GENERIC(ADDRESS_OF, Is_Struct)
 
     Element* v = Element_ARG(VALUE);
 
-    return Init_Integer(OUT, p_cast(intptr_t, Cell_Struct_Data_At(v)));
+    Init_Integer(OUT, p_cast(intptr_t, Cell_Struct_Data_At(v)));
+    return BOUNCE_OUT;
 }
 
 
@@ -1649,7 +1652,8 @@ IMPLEMENT_GENERIC(ADDRESS_OF, Is_Struct)
     IMPLEMENT_GENERIC(SPEC_OF, Is_Struct)
     {
         INCLUDE_PARAMS_OF_SPEC_OF;
-        return Init_Block(D_OUT, Struct_To_Array(Cell_Struct(val)));
+        Init_Block(D_OUT, Struct_To_Array(Cell_Struct(val)));
+        return BOUNCE_OUT;
     }
 */
 
@@ -1683,7 +1687,7 @@ DECLARE_NATIVE(MAKE_SIMILAR_STRUCT)
     require (
       Init_Struct_Fields(OUT, body)
     );
-    return OUT;
+    return BOUNCE_OUT;
 }
 
 
@@ -1722,5 +1726,5 @@ DECLARE_NATIVE(DESTROY_STRUCT_STORAGE)
     if (ARG(FREE))
         rebElide(rebRUN(unwrap ARG(FREE)), pointer);  // may not be routine [1]
 
-    return TRASH;
+    return TRASH_OUT;
 }
