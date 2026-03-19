@@ -257,7 +257,7 @@ IMPLEMENT_GENERIC(MOLDIFY, Is_Struct)
 
     Element* cell = Element_ARG(VALUE);
     Molder* mo = Cell_Handle_Pointer(Molder, ARG(MOLDER));
-    bool form = did ARG(FORM);
+    bool form = ARG(FORM);
 
     UNUSED(form); // no difference between MOLD and FORM at this time
 
@@ -1371,7 +1371,7 @@ IMPLEMENT_GENERIC(MAKE, Is_Struct)
 
     UNUSED(PARAM(TYPE));
 
-    Element* arg = Element_ARG(DEF);
+    Element* arg = ARG(DEF);
 
     if (not Is_Block(arg))
         panic (PARAM(DEF));
@@ -1612,7 +1612,7 @@ IMPLEMENT_GENERIC(BYTES_OF, Is_Struct)
 {
     INCLUDE_PARAMS_OF_BYTES_OF;
 
-    Element* val = Element_ARG(VALUE);
+    Element* val = ARG(VALUE);
 
     Binary* bin = Make_Binary(Cell_Struct_Total_Size(val));
     memcpy(
@@ -1640,7 +1640,7 @@ IMPLEMENT_GENERIC(ADDRESS_OF, Is_Struct)
 {
     INCLUDE_PARAMS_OF_ADDRESS_OF;
 
-    Stable* v = Element_ARG(VALUE);
+    Element* v = Element_ARG(VALUE);
 
     return Init_Integer(OUT, p_cast(intptr_t, Cell_Struct_Data_At(v)));
 }

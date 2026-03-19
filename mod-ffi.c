@@ -117,12 +117,11 @@ DECLARE_NATIVE(GET_AT_POINTER)
 //
 //  "Set the contents of a cell, e.g. one returned by ALLOC-VALUE-POINTER"
 //
-//      return: [any-stable?]
+//      return: [any-value?]
 //      target "A pointer to a Rebol value (Cell*)"
 //          [integer!]
-//      value "Value to assign, will be same as return value"
-//          [any-stable?]
-//      :any "Do not error on TRASH!"
+//      ^value "Value to assign, will be same as return value"
+//          [any-value?]
 //  ]
 //
 DECLARE_NATIVE(SET_AT_POINTER)
@@ -132,11 +131,7 @@ DECLARE_NATIVE(SET_AT_POINTER)
 {
     INCLUDE_PARAMS_OF_SET_AT_POINTER;
 
-    Stable* v = ARG(VALUE);
-
-    if (Is_Trash(v) and not ARG(ANY)) {
-        // !!! current philosophy is to allow all assignments
-    }
+    Value* v = ARG(VALUE);
 
     Value* target = p_cast(Value*, i_cast(intptr_t, VAL_INT64(ARG(TARGET))));
     Copy_Cell(target, v);
