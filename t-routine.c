@@ -155,7 +155,7 @@ static Result(None) Make_Schema_From_Block(
 
     assert(Is_Block(block));
     if (Series_Len_At(block) == 0)
-        panic (block);
+        panic (Error_Bad_Value(block));
 
     const Element* tail;
     const Element* item = List_At(&tail, block);
@@ -169,7 +169,7 @@ static Result(None) Make_Schema_From_Block(
 
         ++item;
         if (item == tail or not Is_Block(item))
-            panic (block);
+            panic (Error_Bad_Value(block));
 
         // Use the block spec to build a temporary structure through the same
         // machinery that implements `make struct! [...]`
@@ -210,14 +210,14 @@ static Result(None) Make_Schema_From_Block(
     }
 
     if (Series_Len_At(block) != 1)
-        panic (block);
+        panic (Error_Bad_Value(block));
 
     // !!! It was presumed the only parameter convention that made sense was
     // a normal args, but quoted ones could work too.  In particular, anything
     // passed to the C as a REBVAL*.  Not a huge priority.
     //
     if (not Is_Word(item))
-        panic (block);
+        panic (Error_Bad_Value(block));
 
     Option(SymId) id = Word_Id(item);
     if (id == SYM_VOID) {
@@ -560,7 +560,7 @@ static Result(Offset) Cell_To_Ffi(
         // structs should be processed above by the HANDLE! case, not WORD!
         //
         assert(false);
-        panic (arg);
+        panic (Error_Bad_Value(arg));
 
       case SYM_VOID:
         //
@@ -568,11 +568,11 @@ static Result(Offset) Cell_To_Ffi(
         // return types, so caller should check and not try to pass it in.
         //
         assert(false);
-        panic (arg);
+        panic (Error_Bad_Value(arg));
 
       default:
         assert(false);
-        panic (arg);
+        panic (Error_Bad_Value(arg));
     }
 
     if (store) {
@@ -1255,7 +1255,7 @@ Result(RoutineDetails*) Alloc_Ffi_Action_For_Spec(
 
         if (Is_Set_Word(item)) {  // TYPE_CHAIN, not TYPE_SET_WORD
             if (Word_Id(item) != SYM_RETURN)
-                panic (item);
+                panic (Error_Bad_Value(item));
 
             if (not Is_Space(ret_schema_or_space))
                 panic ("FFI: Return already specified");
@@ -1322,7 +1322,7 @@ Result(RoutineDetails*) Alloc_Ffi_Action_For_Spec(
             }
         }
         else
-            panic (item);
+            panic (Error_Bad_Value(item));
     }
 
   pop_paramlist_and_create_routine: { ////////////////////////////////////////
@@ -1450,9 +1450,9 @@ DECLARE_NATIVE(MAKE_ROUTINE)
     Element* spec = Element_ARG(FFI_SPEC);
 
     Api(Value*) value;
-    Api(Value*) warning = rebRescue2(&value, "pick", ARG(LIB), ARG(NAME));
-    if (warning)  // PICK returned ERROR!, Rescue made WARNING!
-        panic (Cell_Error(warning));
+    Api(Value*) error = rebRescue2(&value, "pick", ARG(LIB), ARG(NAME));
+    if (error)  // PICK returned FAILURE!, Rescue made ERROR!
+        panic (Cell_Error(error));
 
     require (
       Stable* handle = Ensure_Stable(value)

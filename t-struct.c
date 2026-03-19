@@ -493,13 +493,13 @@ static Result(None) Parse_Struct_Attribute(
 
     while (attr != tail) {
         if (not Is_Set_Word(attr))
-            panic (attr);
+            panic (Error_Bad_Value(attr));
 
         switch (opt Word_Id(attr)) {
           case EXT_SYM_RAW_SIZE:
             ++attr;
             if (attr == tail or not Is_Integer(attr))
-                panic (attr);
+                panic (Error_Bad_Value(attr));
             if (*raw_size > 0)
                 panic ("FFI: duplicate raw size");
             *raw_size = VAL_INT64(attr);
@@ -510,7 +510,7 @@ static Result(None) Parse_Struct_Attribute(
           case EXT_SYM_RAW_MEMORY:
             ++attr;
             if (attr == tail or not Is_Integer(attr))
-                panic (attr);
+                panic (Error_Bad_Value(attr));
             if (*raw_addr != 0)
                 panic ("FFI: duplicate raw memory");
             *raw_addr = i_cast(REBU64, VAL_INT64(attr));
@@ -525,20 +525,20 @@ static Result(None) Parse_Struct_Attribute(
                 panic ("FFI: raw memory is exclusive with extern");
 
             if (attr == tail or not Is_Block(attr) or Series_Len_At(attr) != 2)
-                panic (attr);
+                panic (Error_Bad_Value(attr));
 
             const Element* lib = List_Item_At(attr);
             if (rebNot("library! = type of", lib))
-                panic (attr);
+                panic (Error_Bad_Value(lib));
 
             const Element* linkname = List_Item_At(attr) + 1;
             if (not Any_String(linkname))
-                panic (linkname);
+                panic (Error_Bad_Value(linkname));
 
             RebolValue* result;
-            RebolValue* warning = rebRescue2(&result, "pick", lib, linkname);
-            if (warning)
-                panic (Cell_Error(warning));
+            RebolValue* error = rebRescue2(&result, "pick", lib, linkname);
+            if (error)
+                panic (error);
 
             Element* handle = Unquotify(Known_Element(result));
             CFunction* addr = Cell_Handle_Cfunc(handle);
@@ -550,14 +550,14 @@ static Result(None) Parse_Struct_Attribute(
         case EXT_SYM_ALIGNMENT:
             ++ attr;
             if (not Is_Integer(attr))
-                panic (attr);
+                panic (Error_Bad_Value(attr));
 
             alignment = VAL_INT64(attr);
             break;
         */
 
           default:
-            panic (attr);
+            panic (Error_Bad_Value(attr));
         }
 
         ++attr;
@@ -847,7 +847,7 @@ static Result(None) Parse_Field_Type(
             break; }
 
           default:
-            panic (val);
+            panic (Error_Bad_Value(val));
         }
     }
     else if (Is_Struct(val)) {
@@ -928,7 +928,7 @@ Result(None) Init_Struct_Fields(
 
             // make sure no other field initialization
             if (Series_Len_Head(spec) != 1)
-                panic (spec);
+                panic (Error_Bad_Value(spec));
 
             require (
               Parse_Struct_Attribute(
@@ -948,7 +948,7 @@ Result(None) Init_Struct_Fields(
         else {
             word = spec_item;
             if (not Is_Set_Word(word))
-                panic (word);
+                panic (Error_Bad_Value(word));
         }
 
         const Element* fld_val = spec_item + 1;
@@ -970,7 +970,7 @@ Result(None) Init_Struct_Fields(
                     REBLEN dimension = Field_Dimension(field);
 
                     if (Series_Len_At(fld_val) != dimension)
-                        panic (fld_val);
+                        panic (Error_Bad_Value(fld_val));
 
                     REBLEN n = 0;
                     const Element* at = List_Item_At(fld_val);
@@ -994,7 +994,7 @@ Result(None) Init_Struct_Fields(
                     );
                 }
                 else
-                    panic (fld_val);
+                    panic (Error_Bad_Value(fld_val));
             }
             else {
                 require (
@@ -1159,12 +1159,12 @@ Result(Element*) Make_Struct(Sink(Element) out, const Element* arg)
     if (Is_Set_Word(at)) {  // Set-words initialize
         expect_init = true;
         if (raw_addr)  // initialize not allowed for raw memory struct
-            panic (at);
+            panic (Error_Bad_Value(at));
     }
     else if (Is_Word(at))  // Words don't initialize
         expect_init = false;
     else
-        panic (at);
+        panic (Error_Bad_Value(at));
 
     Init_Word(Field_Detail(field, IDX_FIELD_NAME), Word_Symbol(at));
 
@@ -1175,7 +1175,7 @@ Result(Element*) Make_Struct(Sink(Element) out, const Element* arg)
     at = At_Level(L);
 
     if (not Is_Block(at))
-        panic (at);
+        panic (Error_Bad_Value(at));
 
     Derelativize(spec, at, List_Binding(arg));
 
@@ -1213,7 +1213,7 @@ Result(Element*) Make_Struct(Sink(Element) out, const Element* arg)
 
     if (expect_init) {
         if (Is_Level_At_End(L))
-            panic (arg);
+            panic (Error_Bad_Value(arg));
 
         at = At_Level(L);
 
@@ -1580,7 +1580,7 @@ IMPLEMENT_GENERIC(OLDGENERIC, Is_Struct)
             panic (Error_Unexpected_Type(TYPE_BLOB, Datatype_Of(arg)));
 
         if (Series_Len_At(arg) != Cell_Struct_Data_Size(val))
-            panic (arg);
+            panic (Error_Bad_Value(arg));
 
         memcpy(
             Cell_Struct_Data_Head(val),
