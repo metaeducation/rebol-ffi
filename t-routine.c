@@ -1345,10 +1345,11 @@ Result(RoutineDetails*) Alloc_Ffi_Action_For_Spec(
 
     Option(Phase*) prior = nullptr;
     Option(VarList*) prior_coupling = nullptr;
+    Option(Element*) gather = nullptr;
 
     require (
       ParamList* paramlist = Pop_Paramlist(
-        base, methodization, prior, prior_coupling
+        base, methodization, prior, prior_coupling, gather
       )
     );
 
