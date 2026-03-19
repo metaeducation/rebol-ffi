@@ -1043,10 +1043,9 @@ Result(Element*) Make_Struct(Sink(Element) out, const Element* arg)
     require (
       Level* L = Make_Level_At(&Stepper_Executor, arg, LEVEL_MASK_NONE)
     );
-    const Element* at = At_Level(L);
+    Push_Level(L);
 
-    DECLARE_VALUE (eval);
-    Push_Level_Erase_Out_If_State_0(eval, L);
+    const Element* at = At_Level(L);
 
     REBINT max_fields = 16;
 
