@@ -285,7 +285,7 @@ INLINE static void* Expand_And_Align_Core(
     require (
       Expand_Flex_Tail_And_Update_Used(store, padding + size)
     );
-    return Flex_Data(store) + *offset_out;
+    return Flex_Bytes(store) + *offset_out;
 }
 
 INLINE static void* Expand_And_Align(
@@ -979,7 +979,7 @@ Bounce Routine_Dispatcher(Level* const L)
     // data won't be relocated)
 
     if (Routine_Return_Schema_Unless_Void(r))
-        ret_offset = Flex_Data(store) + p_cast(Offset, ret_offset);
+        ret_offset = Flex_Bytes(store) + p_cast(Offset, ret_offset);
     else
         ret_offset = nullptr;  // void return, no associated storage
 
