@@ -364,12 +364,12 @@ static Result(None) Set_Scalar_In_Struct_core(
     switch (opt Type_Of(val)) {
       case TYPE_DECIMAL:
         d = VAL_DECIMAL(val);
-        i = u_cast(int64_t, d);
+        i = raw_cast(int64_t, d);
         break;
 
       case TYPE_INTEGER:
         i = VAL_INT64(val);
-        d = u_cast(double, i);
+        d = raw_cast(double, i);
         break;
 
       default:
@@ -435,7 +435,7 @@ static Result(None) Set_Scalar_In_Struct_core(
         break;
 
       case EXT_SYM_FLOAT:
-        *cast(float*, data) = u_cast(float, d);
+        *cast(float*, data) = raw_cast(float, d);
         break;
 
       case EXT_SYM_DOUBLE:
@@ -889,7 +889,7 @@ static Result(None) Parse_Field_Type(
         DECLARE_ELEMENT (ret);
         Context* derived = Derive_Binding(List_Binding(spec), val);
 
-        Sink(Value) atom_ret = u_cast(Value*, ret);
+        Sink(Value) atom_ret = raw_cast(Value*, ret);
         if (Eval_Any_List_At_Throws(atom_ret, val, derived))
             panic (Error_No_Catch_For_Throw(TOP_LEVEL));
 
@@ -1231,7 +1231,7 @@ Result(Element*) Make_Struct(Sink(Element) out, const Element* arg)
             Corrupt_If_Needful(at);
         }
         else {
-            Sink(Value) atom_init = u_cast(Value*, init);
+            Sink(Value) atom_init = raw_cast(Value*, init);
 
             if (Eval_Step_Throws(atom_init, L))
                 panic (Error_No_Catch_For_Throw(TOP_LEVEL));
@@ -1336,7 +1336,7 @@ Result(Element*) Make_Struct(Sink(Element) out, const Element* arg)
 } finalize_struct: { /////////////////////////////////////////////////////////
 
     require (
-      StructInstance* stu = u_downcast Prep_Stub(STUB_MASK_STRUCT, Alloc_Stub())
+      StructInstance* stu = raw_downcast Prep_Stub(STUB_MASK_STRUCT, Alloc_Stub())
     );
     Force_Erase_Cell(Stub_Cell(stu));
     Manage_Stub(schema);
@@ -1548,7 +1548,9 @@ IMPLEMENT_GENERIC(EQUAL_Q, Is_Struct)
 StructInstance* Copy_Struct_Managed(StructInstance* src)
 {
     require (
-      StructInstance* copy = u_downcast Prep_Stub(STUB_MASK_STRUCT, Alloc_Stub())
+      StructInstance* copy = raw_downcast Prep_Stub(
+        STUB_MASK_STRUCT, Alloc_Stub()
+      )
     );
     Force_Erase_Cell(Stub_Cell(copy));
 

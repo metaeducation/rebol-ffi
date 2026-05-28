@@ -616,7 +616,7 @@ static Result(None) Ffi_To_Cell(
         assert(not Field_Is_C_Array(top));  // !!! wasn't supported, should be?
 
         trap (
-          StructInstance* stu = u_downcast Prep_Stub(
+          StructInstance* stu = raw_downcast Prep_Stub(
             STUB_MASK_STRUCT, Alloc_Stub()
           )
         );
@@ -1331,7 +1331,7 @@ Result(RoutineDetails*) Alloc_Ffi_Action_For_Spec(
                 require (
                   Make_Schema_From_Block(
                     cell,  // schema (out)
-                    u_cast(Sink(Element), PUSH()),  // param (out)
+                    raw_cast(Sink(Element), PUSH()),  // param (out)
                     block,  // block (in)
                     name
                 ));
