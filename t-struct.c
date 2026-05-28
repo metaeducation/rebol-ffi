@@ -119,7 +119,7 @@ static Result(None) Get_Scalar_In_Struct(
         break;
 
       case EXT_SYM_REBVAL: {
-        Value* undecayed = cast(Value*, p);  // can store unstable Value*
+        Value* undecayed = cast(Value*, upcast(void*, p));  // can be unstable
         require (
           Stable* stable = Decay_If_Unstable(undecayed)
         );
