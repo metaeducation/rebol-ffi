@@ -47,7 +47,7 @@ DECLARE_NATIVE(ALLOC_VALUE_POINTER)
 {
     INCLUDE_PARAMS_OF_ALLOC_VALUE_POINTER;
 
-    Value* allocated = Copy_Cell(Alloc_Value(), ARG(VALUE));
+    Value* allocated = Copied_Cell(Alloc_Value(), ARG(VALUE));
     rebUnmanage(allocated);
 
     Init_Integer(OUT, p_cast(intptr_t, allocated));
