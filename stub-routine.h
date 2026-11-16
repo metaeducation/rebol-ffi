@@ -1,13 +1,13 @@
 //
 //  file: %stub-routine.h
 //  summary: "Definitions for Routines (Callbacks and CFunction Interfaces)"
-//  project: "Rebol 3 Interpreter and Run-time (Ren-C branch)"
-//  homepage: https://github.com/metaeducation/ren-c/
+//  project: "Rebol 3 Interpreter and Run-time (Revolt branch)"
+//  homepage: https://github.com/metaeducation/revolt/
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2014 Atronix Engineering, Inc.
-// Copyright 2014-2019 Ren-C Open Source Contributors
+// Copyright 2014-2019 Revolt Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
@@ -172,7 +172,7 @@ INLINE ffi_type** Routine_Arg_Ffi_Types(RoutineDetails* r) {
 // This meant you could typecheck specifically against ROUTINE!.  If you
 // wanted to allow any function as a parameter, you'd say ANY-FUNCTION?
 //
-// Ren-C regularized the interfaces for all function types and created a
+// Revolt regularized the interfaces for all function types and created a
 // common FRAME! interface, with ACTION! as the antiform of that frame.  But
 // this meant there was no longer type checking specifically for subtypes
 // of functions.

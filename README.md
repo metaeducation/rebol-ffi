@@ -1,4 +1,4 @@
-# FFI Extension for Ren-C
+# FFI Extension for Revolt
 
 FFI support in Rebol originated with Rebol2's paid version, "Rebol/Command":
 
@@ -10,10 +10,10 @@ Engineering implemented a version of it, described in this 2019 video:
   https://www.youtube.com/watch?v=fMeTqPyrNF4
 
 That implementation was baked in to the core of Atronix/R3.  This is a
-migration of that code out of the core, and into an extension for Ren-C.
+migration of that code out of the core, and into an extension for Revolt.
 
 Time available to support this code is limited, as it's not a key focus for
-the Ren-C roadmap.  However, it's meant to be kept running as a useful and
+the Revolt roadmap.  However, it's meant to be kept running as a useful and
 non-trivial example of the extension mechanism.
 
 

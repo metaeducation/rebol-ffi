@@ -1,13 +1,13 @@
 //
 //  file: %reb-struct.h
 //  summary: "Struct to C function"
-//  project: "Rebol 3 Interpreter and Run-time (Ren-C branch)"
-//  homepage: https://github.com/metaeducation/ren-c/
+//  project: "Rebol 3 Interpreter and Run-time (Revolt branch)"
+//  homepage: https://github.com/metaeducation/revolt/
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2014 Atronix Engineering, Inc.
-// Copyright 2014-2019 Ren-C Open Source Contributors
+// Copyright 2014-2019 Revolt Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
@@ -59,7 +59,7 @@
 //   describe things like the properties of a routine, or the schema of a
 //   struct layout.  This required specialized hooks into the garbage
 //   collector, that indicated locations in those C structs that pointers to
-//   GC-managed elements lived.  Ren-C moved away from this, so that the
+//   GC-managed elements lived.  Revolt moved away from this, so that the
 //   descriptors are ordinary Rebol arrays.  It's only a little bit less
 //   efficient, and permitted the FFI to be migrated to an extension, so it
 //   would not bring cost to builds that didn't use it (e.g. WASM build)

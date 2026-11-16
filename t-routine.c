@@ -2,13 +2,13 @@
 //  file: %t-routine.c
 //  summary: "Support for calling non-Rebol C functions in DLLs w/Rebol args)"
 //  section: datatypes
-//  project: "Rebol 3 Interpreter and Run-time (Ren-C branch)"
-//  homepage: https://github.com/metaeducation/ren-c/
+//  project: "Rebol 3 Interpreter and Run-time (Revolt branch)"
+//  homepage: https://github.com/metaeducation/revolt/
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2014 Atronix Engineering, Inc.
-// Copyright 2014-2017 Ren-C Open Source Contributors
+// Copyright 2014-2017 Revolt Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
@@ -34,7 +34,7 @@
 // like a good thing to do in usermode, as what is actually needed here are
 // PARAMETER! definitions.  (MAKE PARAMETER! doesn't exist yet, but it could.)
 //
-// 1. At one time, Ren-C's VOID! (antiform BLANK!) meant "vanishing" behavior.
+// 1. At one time, Revolt's VOID! (antiform BLANK!) meant "vanishing" behavior.
 //    This has been tamed to where a non-vanishable function returning a void!
 //    will be turned into a "heavy void" (empty pack) if it's in a situation
 //    where vanishing would be risky.  So void is returned by many common
@@ -1075,7 +1075,7 @@ bool Routine_Details_Querier(
 // The GC-able HANDLE! used by callbacks contains a ffi_closure pointer that
 // needs to be freed when the handle references go away (really only one
 // reference is likely--in the ACT_BODY of the callback, but still this is
-// how the GC gets hooked in Ren-C)
+// how the GC gets hooked in Revolt)
 //
 void cleanup_ffi_closure(void* p, size_t length) {
     UNUSED(length);
@@ -1304,7 +1304,7 @@ Result(RoutineDetails*) Alloc_Ffi_Action_For_Spec(
                 // "chain" by default, if VARARGS! was not explicitly added.
                 // This feature was removed, but may be re-added:
                 //
-                // https://github.com/metaeducation/ren-c/issues/801
+                // https://github.com/metaeducation/revolt/issues/801
                 //
                 // For that reason, varargs was not in the list by default.
                 //
